@@ -1,11 +1,14 @@
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={compact ? 'logo compact' : 'logo'} aria-label="EVS - Equipe que Vende Sozinha">
-      <span className="logo-mark">EVS</span>
+    <div
+      className={compact ? 'logo compact' : 'logo'}
+      aria-label="Academia de Vendas Suzana Zatorre"
+    >
+      <span className="logo-mark">SZ</span>
       {!compact && (
         <span className="logo-copy">
-          <strong>EVS</strong>
-          <small>Equipe que Vende Sozinha</small>
+          <strong>Academia</strong>
+          <small>de Vendas Suzana Zatorre</small>
         </span>
       )}
     </div>

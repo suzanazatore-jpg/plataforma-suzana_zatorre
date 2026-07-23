@@ -2,6 +2,7 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  GraduationCap,
   Headphones,
   MessageCircle,
   PlayCircle,
@@ -16,6 +17,29 @@ export const supportUrl =
 export const checkoutUrl =
   process.env.NEXT_PUBLIC_CHECKOUT_URL ||
   'https://clkdmg.site/pay/novo-evs-equipe-que-vende-sozinha';
+
+export const platformCourses = [
+  {
+    id: 'comece-por-aqui',
+    eyebrow: 'inicio',
+    title: 'Comece por Aqui',
+    description: 'Entenda como usar a Academia, acessar aulas, baixar materiais e pedir suporte.',
+    duration: 'Primeiros passos',
+    icon: PlayCircle,
+    accent: '#ff4b7a',
+    href: '#comece-por-aqui'
+  },
+  {
+    id: 'evs',
+    eyebrow: 'curso principal',
+    title: 'EVS - Equipe que Vende Sozinha',
+    description: 'Implante rotina, padrao comercial e acompanhamento para vender sem depender de voce.',
+    duration: `${7} aulas + bonus`,
+    icon: GraduationCap,
+    accent: '#e6325a',
+    href: '#evs'
+  }
+];
 
 export const lessons = [
   {
