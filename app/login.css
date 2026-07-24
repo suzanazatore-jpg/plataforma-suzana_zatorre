@@ -1,0 +1,192 @@
+.login-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.login-bg {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, .62), rgba(0, 0, 0, .92)),
+    radial-gradient(circle at 72% 26%, rgba(230, 50, 90, .25), transparent 28%),
+    radial-gradient(circle at 26% 76%, rgba(230, 50, 90, .18), transparent 30%),
+    url('https://suzanazatorre.com.br/wp-content/uploads/2026/05/chatgpt-image-23-de-mai-de-2026-23-27-41.png');
+  background-position: center;
+  background-size: cover;
+  filter: saturate(.8);
+  inset: 0;
+  opacity: .42;
+  position: absolute;
+  transform: scale(1.04);
+}
+
+.login-page::after {
+  background-image:
+    linear-gradient(35deg, transparent 0 45%, rgba(255, 255, 255, .05) 46% 47%, transparent 48%),
+    linear-gradient(145deg, transparent 0 40%, rgba(230, 50, 90, .08) 41% 42%, transparent 43%);
+  content: '';
+  inset: 0;
+  opacity: .7;
+  position: absolute;
+}
+
+.login-card {
+  background: rgba(15, 14, 14, .82);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 2px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .5);
+  max-width: 560px;
+  padding: 52px 54px 38px;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+.logo {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.logo-mark {
+  align-items: center;
+  background: linear-gradient(135deg, #ff4b7a, #e6325a);
+  border-radius: 14px;
+  color: #fff;
+  display: inline-flex;
+  font-family: Anton, sans-serif;
+  font-size: 28px;
+  height: 62px;
+  justify-content: center;
+  letter-spacing: 1px;
+  line-height: 1;
+  width: 82px;
+}
+
+.logo-copy {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.logo-copy strong {
+  font-family: Anton, sans-serif;
+  font-size: 48px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  line-height: .9;
+}
+
+.logo-copy small {
+  color: #ff4b7a;
+  font-family: Archivo, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+
+.login-kicker {
+  color: #fff;
+  font-family: Archivo, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  margin: 34px 0 24px;
+  text-align: center;
+}
+
+.login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.login-form label span {
+  color: #bfb7b3;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.field {
+  align-items: center;
+  background: #f1f5ff;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #757b86;
+  display: flex;
+  gap: 10px;
+  height: 58px;
+  padding: 0 16px;
+}
+
+.field:focus-within {
+  border-color: var(--rose);
+  box-shadow: 0 0 0 3px rgba(230, 50, 90, .2);
+}
+
+.field input {
+  background: transparent;
+  border: 0;
+  color: #151515;
+  flex: 1;
+  font-size: 15px;
+  outline: 0;
+}
+
+.forgot {
+  color: #d9d3d0;
+  font-size: 14px;
+  justify-self: end;
+  margin-top: -6px;
+  text-decoration: none;
+}
+
+.login-submit {
+  min-height: 58px;
+  width: 100%;
+}
+
+.login-support {
+  align-items: center;
+  color: #25d366;
+  display: flex;
+  font-family: Archivo, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 26px;
+  text-decoration: none;
+}
+
+.access-copy {
+  color: #d9d3d0;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: -8px auto 24px;
+  max-width: 420px;
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .login-page {
+    padding: 18px;
+  }
+
+  .login-card {
+    padding: 36px 22px 28px;
+  }
+
+  .logo {
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .logo-copy {
+    text-align: center;
+  }
+}
