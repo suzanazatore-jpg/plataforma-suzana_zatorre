@@ -34,7 +34,7 @@
 .member-sidebar .logo img {
   display: block;
   height: auto;
-  max-width: 150px;
+  max-width: 132px;
   width: 100%;
 }
 
@@ -130,53 +130,55 @@
     radial-gradient(circle at 82% 22%, rgba(230, 50, 90, .34), transparent 28%),
     #000;
   border-bottom: 1px solid #282323;
-  padding: 58px 0;
+  padding: 42px 0;
 }
 
 .hero-grid {
   align-items: center;
   display: grid;
-  gap: 64px;
-  grid-template-columns: minmax(0, .95fr) minmax(320px, 460px);
+  gap: 42px;
+  grid-template-columns: minmax(0, .9fr) minmax(280px, 360px);
 }
 
 .hero-copy .logo {
   justify-content: flex-start;
-  margin: 0 0 26px;
+  margin: 0 0 18px;
 }
 
 .hero-copy .logo img {
-  max-width: 360px;
+  max-width: 220px;
 }
 
 .welcome {
   color: var(--rose-hot);
   display: inline-block;
   font-family: Archivo, system-ui, sans-serif;
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 800;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
 }
 
 .hero-member h1 {
   color: #fff;
-  font-size: clamp(38px, 4.3vw, 68px);
-  font-weight: 900;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: .94;
+  line-height: 1.04;
   margin: 0;
-  max-width: 620px;
+  max-width: 520px;
   text-transform: uppercase;
 }
 
 .hero-member p {
   color: #d9d3d0;
-  font-size: 17px;
-  line-height: 1.6;
-  max-width: 580px;
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 500px;
 }
 
 .hero-photo-card {
+  aspect-ratio: 4 / 3;
   border: 1px solid #3b242b;
   border-radius: 8px;
   box-shadow: 0 28px 90px rgba(230, 50, 90, .16);
@@ -188,9 +190,9 @@
 .hero-photo-card img {
   display: block;
   filter: saturate(.95) contrast(1.02);
-  height: auto;
+  height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center top;
   width: 100%;
 }
 
@@ -222,7 +224,7 @@
 
 .course-home-grid {
   align-items: start;
-  grid-template-columns: repeat(auto-fill, minmax(178px, 220px));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 178px));
 }
 
 .lesson-card,
@@ -230,9 +232,9 @@
   background: #24211f;
   border: 1px solid #34302e;
   border-radius: 8px;
-  min-height: 280px;
+  min-height: 240px;
   overflow: hidden;
-  padding: 22px;
+  padding: 18px;
   position: relative;
 }
 
@@ -291,7 +293,7 @@
 }
 
 .course-cover-card h3 {
-  font-size: clamp(24px, 2.1vw, 32px);
+  font-size: clamp(20px, 1.7vw, 25px);
   font-weight: 900;
   line-height: .94;
   margin-top: 42px;
