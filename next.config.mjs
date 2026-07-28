@@ -2,6 +2,7 @@
 const nextConfig = {
   experimental: {
     serverActions: {
+      // Permite Server Actions na previa do GitHub Codespaces.
       allowedOrigins: ['*.app.github.dev']
     }
   },
