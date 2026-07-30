@@ -1,112 +1,183 @@
 import Link from 'next/link';
 import {
-  ArrowLeft,
   Users,
   BookOpen,
   FileText,
-  CreditCard,
+  Layers,
   UsersRound,
-  Award,
-  ShieldCheck,
+  GraduationCap,
+  Image,
+  GalleryHorizontal,
   MessageSquare,
+  Mail,
+  Send,
+  Palette,
+  ShieldCheck,
+  Smartphone,
   Fingerprint,
-  Settings
+  UserCog
 } from 'lucide-react';
-import './admin.css';
 
-// MODO DE CONSTRUÇÃO: hub do Admin aberto, sem login e sem Supabase.
-// Os cards da Fase 1 ainda não levam a lugar nenhum — construímos Alunos,
-// Cursos e Termos nas próximas etapas. Quando a plataforma estiver pronta,
-// entra a checagem de admin de verdade.
-const fase2 = [
-  { icon: CreditCard, label: 'Planos e ofertas' },
-  { icon: UsersRound, label: 'Mentores' },
-  { icon: Award, label: 'Certificados' },
-  { icon: ShieldCheck, label: 'Proteção DRM' },
-  { icon: MessageSquare, label: 'SMS' },
-  { icon: Fingerprint, label: 'Autenticação' },
-  { icon: Settings, label: 'Administradores' }
-];
-
-export default function AdminHubPage() {
+// MODO DE CONSTRUÇÃO: painel do Admin. Os cards em cinza (dim) são da Fase 2.
+// Por enquanto só "Usuários" leva a uma tela pronta; os demais são construídos em seguida.
+export default function AdminPage() {
   return (
-    <div className="admin-hub">
-      <div className="ah-glow" aria-hidden />
-      <div className="ah-glow ah-glow-2" aria-hidden />
+    <>
+      <div className="crumb">⚙ Administrador</div>
 
-      <div className="ah-wrap">
-        <header className="ah-top">
-          <div className="ah-brand">
-            <img
-              className="ah-logo"
-              src="/brand/logo-dark.png"
-              alt="Academia de Vendas Suzana Zatorre"
-            />
-            <span className="ah-title">Painel administrativo</span>
-          </div>
-          <Link className="ah-back" href="/area">
-            <ArrowLeft size={16} /> Voltar para a área
-          </Link>
-        </header>
-
-        <div className="ah-phase">
-          <span className="ah-tag">Fase 1</span>
-          <span className="ah-sub">O essencial para colocar alunos e cursos no ar</span>
-        </div>
-
-        <div className="ah-grid">
-          <Link className="ah-card" href="#">
-            <span className="ah-ico">
-              <Users size={26} />
-            </span>
-            <h3>Alunos</h3>
-            <p>Cadastrar alunas, liberar acesso a cada curso e gerenciar quem entra.</p>
-            <span className="ah-go">Gerenciar →</span>
-          </Link>
-
-          <Link className="ah-card" href="#">
-            <span className="ah-ico">
-              <BookOpen size={26} />
-            </span>
-            <h3>Cursos</h3>
-            <p>Criar e editar cursos, módulos e aulas, com vídeos e materiais.</p>
-            <span className="ah-go">Gerenciar →</span>
-          </Link>
-
-          <Link className="ah-card" href="#">
-            <span className="ah-ico">
-              <FileText size={26} />
-            </span>
-            <h3>Termos de uso</h3>
-            <p>Editar o texto dos termos que a aluna aceita ao entrar na plataforma.</p>
-            <span className="ah-go">Editar →</span>
-          </Link>
-        </div>
-
-        <div className="ah-phase">
-          <span className="ah-tag later">Fase 2</span>
-          <span className="ah-sub">Recursos avançados que entram numa segunda leva</span>
-        </div>
-
-        <div className="ah-grid later">
-          {fase2.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div className="ah-card" key={item.label}>
-                <span className="ah-later-pill">depois</span>
-                <span className="ah-ico">
-                  <Icon size={24} />
-                </span>
-                <h3>{item.label}</h3>
+      <div className="pad">
+        <div className="group">
+          <h2>Gerenciamento de Conteúdo e Usuários</h2>
+          <p>Gerencie o conteúdo e os alunos da sua área de membros.</p>
+          <div className="grid">
+            <Link className="acard" href="/admin/usuarios">
+              <span className="ic"><Users size={24} /></span>
+              <div>
+                <h3>Usuários</h3>
+                <p>Cadastre alunos, libere acesso aos cursos e gerencie status.</p>
               </div>
-            );
-          })}
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><BookOpen size={24} /></span>
+              <div>
+                <h3>Cursos e Aulas</h3>
+                <p>Crie cursos, módulos e aulas com vídeo e materiais.</p>
+              </div>
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><FileText size={24} /></span>
+              <div>
+                <h3>Termos de Uso</h3>
+                <p>O texto que o aluno aceita no primeiro acesso (reembolso, regras).</p>
+              </div>
+            </Link>
+            <div className="acard dim">
+              <span className="ic"><Layers size={24} /></span>
+              <div>
+                <h3>Planos e Ofertas <span className="tag">depois</span></h3>
+                <p>Gerencie planos e ofertas de acesso aos cursos.</p>
+              </div>
+            </div>
+            <div className="acard dim">
+              <span className="ic"><UsersRound size={24} /></span>
+              <div>
+                <h3>Mentores <span className="tag">depois</span></h3>
+                <p>Associe mentores às aulas do seu clube.</p>
+              </div>
+            </div>
+            <div className="acard dim">
+              <span className="ic"><GraduationCap size={24} /></span>
+              <div>
+                <h3>Certificados <span className="tag">depois</span></h3>
+                <p>Certificados de conclusão para os alunos.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <footer className="ah-foot">
-          © 2026 Suzana Zatorre. Todos os direitos reservados. · Painel administrativo — Fase 1
-        </footer>
+        <div className="group">
+          <h2>Dashboard da Área de Membros</h2>
+          <p>Configure a página inicial que o aluno vê.</p>
+          <div className="grid">
+            <Link className="acard" href="#">
+              <span className="ic"><Image size={24} /></span>
+              <div>
+                <h3>Banners da Dashboard</h3>
+                <p>Insira banners de novidades no topo da área de membros.</p>
+              </div>
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><GalleryHorizontal size={24} /></span>
+              <div>
+                <h3>Carrosséis de Cursos</h3>
+                <p>Organize os cursos em seções e carrosséis na dashboard.</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        <div className="group">
+          <h2>Marketing e Comunicação</h2>
+          <p>Ações que comunicam e engajam seus alunos.</p>
+          <div className="grid">
+            <Link className="acard" href="#">
+              <span className="ic"><MessageSquare size={24} /></span>
+              <div>
+                <h3>Comentários</h3>
+                <p>Veja e modere o feedback dos alunos nas aulas.</p>
+              </div>
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><Mail size={24} /></span>
+              <div>
+                <h3>Suporte</h3>
+                <p>Mensagens de suporte recebidas pela plataforma.</p>
+              </div>
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><Send size={24} /></span>
+              <div>
+                <h3>Campanhas e Mensagens <span className="tag new">novo</span></h3>
+                <p>Envie comunicados e e-mails para seus alunos.</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        <div className="group">
+          <h2>Configurações</h2>
+          <p>Cores, preferências e segurança da área de membros.</p>
+          <div className="grid">
+            <Link className="acard" href="#">
+              <span className="ic"><Palette size={24} /></span>
+              <div>
+                <h3>Preferências e Cores</h3>
+                <p>Ajuste o visual da área de membros com o seu estilo.</p>
+              </div>
+            </Link>
+            <Link className="acard" href="#">
+              <span className="ic"><FileText size={24} /></span>
+              <div>
+                <h3>Termos de Uso</h3>
+                <p>Solicite aos alunos que aceitem os termos do seu conteúdo.</p>
+              </div>
+            </Link>
+            <div className="acard dim">
+              <span className="ic"><ShieldCheck size={24} /></span>
+              <div>
+                <h3>Proteção DRM <span className="tag">depois</span></h3>
+                <p>Marca d'água e proteção do conteúdo.</p>
+              </div>
+            </div>
+            <div className="acard dim">
+              <span className="ic"><Smartphone size={24} /></span>
+              <div>
+                <h3>Notificações SMS <span className="tag">depois</span></h3>
+                <p>Envio de notificações por SMS.</p>
+              </div>
+            </div>
+            <div className="acard dim">
+              <span className="ic"><Fingerprint size={24} /></span>
+              <div>
+                <h3>Autenticação e Segurança <span className="tag">depois</span></h3>
+                <p>Regras de login e acesso à área de membros.</p>
+              </div>
+            </div>
+            <div className="acard dim">
+              <span className="ic"><UserCog size={24} /></span>
+              <div>
+                <h3>Administradores <span className="tag">depois</span></h3>
+                <p>Atribua permissões administrativas a outras pessoas.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="legend">
+          <div className="k"><span className="dot" style={{ background: 'var(--hot)' }} /> <b>Fase 1</b> — construímos primeiro (o essencial pra usar)</div>
+          <div className="k"><span className="dot" style={{ background: '#3a3335' }} /> Fase 2 — recursos avançados, entram depois</div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
