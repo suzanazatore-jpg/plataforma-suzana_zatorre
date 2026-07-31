@@ -1,0 +1,76 @@
+.admin-shell {
+  --green: #37c26a;
+  --gold: #f5b301;
+}
+
+.admin-shell .blk-title { font-size: 22px; font-weight: 800; margin: 6px 0 4px; }
+.admin-shell .blk-sub { color: var(--muted2); font-size: 13px; margin: 0 0 18px; }
+.admin-shell .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.admin-shell .btn-pink { background: var(--hot); border: 0; color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; border-radius: 9px; padding: 11px 18px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; text-decoration: none; }
+.admin-shell .btn-ghost { border: 1px solid var(--line); background: transparent; color: #fff; font-family: inherit; font-weight: 700; font-size: 12.5px; border-radius: 9px; padding: 9px 14px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.admin-shell .btn-ghost svg { color: var(--muted); }
+
+.admin-shell .t-pk { background: linear-gradient(135deg, #4a0f22, #240712); }
+.admin-shell .t-gd { background: linear-gradient(135deg, #4a3708, #241a04); }
+.admin-shell .t-gn { background: linear-gradient(135deg, #123d1e, #0b2413); }
+.admin-shell .t-bl { background: linear-gradient(135deg, #122a4a, #0a1424); }
+.admin-shell .t-nt { background: linear-gradient(135deg, #1a1315, #0d0a0b); }
+
+.admin-shell .cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; margin-top: 18px; }
+.admin-shell .ccard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; transition: 0.15s; color: inherit; text-decoration: none; display: block; }
+.admin-shell .ccard:hover { transform: translateY(-3px); border-color: rgba(255, 46, 99, 0.5); }
+.admin-shell .ccard .cthumb { height: 104px; display: grid; place-items: center; text-align: center; padding: 10px; }
+.admin-shell .ccard .cthumb span { font-size: 12px; font-weight: 800; color: #d9cfcb; text-transform: uppercase; letter-spacing: 0.03em; }
+.admin-shell .ccard .cbody { padding: 14px 16px; }
+.admin-shell .ccard h3 { margin: 0 0 6px; font-size: 14.5px; }
+.admin-shell .ccard .meta { color: var(--muted2); font-size: 12px; }
+.admin-shell .ccard .cfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.admin-shell .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.admin-shell .badge.on { color: var(--green); background: rgba(55, 194, 106, 0.12); }
+.admin-shell .badge.off { color: var(--muted2); background: #1c1618; }
+.admin-shell .edit-link { color: var(--hot); font-size: 12.5px; font-weight: 700; }
+
+.admin-shell .course-head { display: flex; gap: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 24px; flex-wrap: wrap; }
+.admin-shell .course-head .cthumb { width: 150px; height: 88px; border-radius: 10px; flex: none; display: grid; place-items: center; text-align: center; padding: 8px; }
+.admin-shell .course-head .cthumb span { font-size: 12px; font-weight: 800; color: #e7ddd9; text-transform: uppercase; }
+.admin-shell .course-head h2 { margin: 0 0 6px; font-size: 18px; }
+.admin-shell .course-head p { margin: 0; color: var(--muted2); font-size: 13px; max-width: 560px; line-height: 1.5; }
+.admin-shell .course-head .hactions { margin-left: auto; display: flex; flex-direction: column; gap: 8px; }
+
+.admin-shell .mods-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+.admin-shell .mods-head h3 { margin: 0; font-size: 16px; }
+.admin-shell .module { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+.admin-shell .mtop { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #140f10; }
+.admin-shell .mtop .grip { color: var(--muted2); }
+.admin-shell .mtop .mname { font-weight: 800; font-size: 14px; }
+.admin-shell .mtop .mcount { color: var(--muted2); font-size: 12px; }
+.admin-shell .mtop .mact { margin-left: auto; display: flex; gap: 8px; }
+.admin-shell .iconbtn { width: 30px; height: 30px; border-radius: 7px; background: #161213; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+.admin-shell .iconbtn:hover { border-color: var(--hot); color: var(--hot); }
+.admin-shell .lesson { display: flex; align-items: center; gap: 14px; padding: 12px 16px 12px 40px; border-top: 1px solid var(--line); }
+.admin-shell .lesson .play { width: 30px; height: 30px; border-radius: 7px; background: #221a1c; color: var(--hot); display: grid; place-items: center; flex: none; }
+.admin-shell .lesson .lname { flex: 1; min-width: 0; }
+.admin-shell .lesson .lname b { font-weight: 700; font-size: 13.5px; display: block; }
+.admin-shell .lesson .lname small { color: var(--muted2); font-size: 11.5px; }
+.admin-shell .lesson .ldur { color: var(--muted2); font-size: 12px; }
+.admin-shell .lesson .lstate { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.admin-shell .lesson .lstate.pub { color: var(--green); background: rgba(55, 194, 106, 0.12); }
+.admin-shell .lesson .lstate.dr { color: var(--gold); background: rgba(245, 179, 1, 0.12); }
+.admin-shell .addlesson { padding: 11px 16px 11px 40px; border-top: 1px solid var(--line); }
+.admin-shell .addlesson button { background: transparent; border: 0; color: var(--hot); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.admin-shell .addmod { margin-top: 6px; }
+
+.admin-shell .modal { background: var(--card); border: 1px solid var(--line); border-radius: 14px; max-width: 520px; margin-top: 26px; overflow: hidden; }
+.admin-shell .modal .mh { padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.admin-shell .modal .mh h3 { margin: 0; font-size: 16px; }
+.admin-shell .modal .mh p { margin: 4px 0 0; color: var(--muted2); font-size: 12.5px; }
+.admin-shell .mtabs { display: flex; gap: 20px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.admin-shell .mtabs a { padding: 12px 0; font-weight: 800; font-size: 13px; color: var(--muted); cursor: pointer; }
+.admin-shell .mtabs a.on { color: var(--hot); border-bottom: 2px solid var(--hot); }
+.admin-shell .modal .mbody { padding: 20px; }
+.admin-shell .field-lbl { font-size: 12.5px; font-weight: 700; margin: 0 0 6px; }
+.admin-shell .inp { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; color: var(--muted2); font-size: 13px; margin-bottom: 16px; }
+.admin-shell .providers { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.admin-shell .prov { font-size: 11.5px; font-weight: 700; padding: 6px 12px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); cursor: pointer; }
+.admin-shell .prov.on { border-color: var(--hot); color: var(--hot); background: rgba(255, 46, 99, 0.08); }
+.admin-shell .modal .mbody .btn-pink { margin-top: 20px; width: 100%; justify-content: center; padding: 12px; }
