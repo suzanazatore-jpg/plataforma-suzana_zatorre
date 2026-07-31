@@ -1,58 +1,14 @@
+import Link from 'next/link';
 import { Users, Filter, Plus, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import './usuarios.css';
 
 // MODO DE CONSTRUÇÃO: lista de alunas com dados de exemplo.
-// Quando ligarmos o Supabase, trocamos este array pela lista real,
-// e "último acesso" / "vencimento" passam a vir dos dados de verdade.
+// Clicar no nome abre a tela de Acesso aos Cursos (exemplo). Dados reais entram com o Supabase.
 const alunas = [
-  {
-    ini: 'MA',
-    nome: 'Mariana Zatorre',
-    email: 'marianozatorre45@gmail.com',
-    acesso: 'hoje',
-    acessoSub: 'às 09:12',
-    vencLabel: 'acesso até',
-    vencData: '28/07/2027',
-    vencTom: '',
-    cursos: '2 cursos',
-    ativo: true
-  },
-  {
-    ini: 'CR',
-    nome: 'Camila Rocha',
-    email: 'camila.rocha@email.com',
-    acesso: 'ontem',
-    acessoSub: 'às 21:40',
-    vencLabel: 'acesso até',
-    vencData: '10/08/2026',
-    vencTom: 'warn',
-    cursos: '1 curso',
-    ativo: true
-  },
-  {
-    ini: 'JS',
-    nome: 'Juliana Souza',
-    email: 'ju.souza@email.com',
-    acesso: '12/07/2026',
-    acessoSub: 'às 08:05',
-    vencLabel: 'venceu em',
-    vencData: '15/07/2026',
-    vencTom: 'exp',
-    cursos: '1 curso',
-    ativo: false
-  },
-  {
-    ini: 'KF',
-    nome: 'Klisse Feitosa',
-    email: 'jklisse25@gmail.com',
-    acesso: 'nunca acessou',
-    acessoSub: '—',
-    vencLabel: 'acesso até',
-    vencData: '25/06/2027',
-    vencTom: '',
-    cursos: 'Sem acesso',
-    ativo: true
-  }
+  { ini: 'MA', nome: 'Mariana Zatorre', email: 'marianozatorre45@gmail.com', acesso: 'hoje', acessoSub: 'às 09:12', vencLabel: 'acesso até', vencData: '28/07/2027', vencTom: '', cursos: '2 cursos', ativo: true },
+  { ini: 'CR', nome: 'Camila Rocha', email: 'camila.rocha@email.com', acesso: 'ontem', acessoSub: 'às 21:40', vencLabel: 'acesso até', vencData: '10/08/2026', vencTom: 'warn', cursos: '1 curso', ativo: true },
+  { ini: 'JS', nome: 'Juliana Souza', email: 'ju.souza@email.com', acesso: '12/07/2026', acessoSub: 'às 08:05', vencLabel: 'venceu em', vencData: '15/07/2026', vencTom: 'exp', cursos: '1 curso', ativo: false },
+  { ini: 'KF', nome: 'Klisse Feitosa', email: 'jklisse25@gmail.com', acesso: 'nunca acessou', acessoSub: '—', vencLabel: 'acesso até', vencData: '25/06/2027', vencTom: '', cursos: 'Sem acesso', ativo: true }
 ];
 
 export default function UsuariosPage() {
@@ -106,17 +62,17 @@ export default function UsuariosPage() {
               {alunas.map((a) => (
                 <tr key={a.email}>
                   <td>
-                    <div className="uinfo">
-                      <span className="ava">{a.ini}</span>
-                      <div>
-                        <strong>{a.nome}</strong>
-                        <small>{a.email}</small>
+                    <Link href="/admin/usuarios/acesso" style={{ color: 'inherit', textDecoration: 'none' }}>
+                      <div className="uinfo">
+                        <span className="ava">{a.ini}</span>
+                        <div>
+                          <strong>{a.nome}</strong>
+                          <small>{a.email}</small>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </td>
-                  <td className="hide dt">
-                    —
-                  </td>
+                  <td className="hide dt">—</td>
                   <td className="dt">
                     {a.acesso}
                     <small>{a.acessoSub}</small>
