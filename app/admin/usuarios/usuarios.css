@@ -1,0 +1,247 @@
+.admin-shell {
+  --green: #37c26a;
+  --red: #e0403f;
+  --gold: #f5b301;
+}
+
+.admin-shell .blk-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 6px 0 4px;
+}
+.admin-shell .blk-sub {
+  color: var(--muted2);
+  font-size: 13px;
+  margin: 0 0 18px;
+}
+
+.admin-shell .u-summary {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 440px;
+  margin-bottom: 30px;
+}
+.admin-shell .u-summary .ic {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #1c1618;
+  display: grid;
+  place-items: center;
+  color: var(--hot);
+  flex: none;
+}
+.admin-shell .u-summary .t {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.admin-shell .u-summary .t b {
+  display: block;
+  color: #fff;
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.admin-shell .utitle {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-shell .utitle h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+.admin-shell .utitle p {
+  color: var(--muted2);
+  font-size: 12.5px;
+  margin: 4px 0 0;
+}
+.admin-shell .tools {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-shell .btn-ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 20px;
+  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.admin-shell .btn-ghost svg {
+  color: var(--muted);
+}
+.admin-shell .btn-pink {
+  background: var(--hot);
+  border: 0;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  border-radius: 20px;
+  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.admin-shell .u-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  overflow-x: auto;
+}
+.admin-shell .utable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-shell .utable th {
+  text-align: left;
+  color: var(--muted2);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.admin-shell .utable td {
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.admin-shell .utable tr:last-child td {
+  border-bottom: 0;
+}
+.admin-shell .utable tbody tr:hover {
+  background: var(--card2);
+}
+.admin-shell .uinfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-shell .uinfo .ava {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1c1618;
+  display: grid;
+  place-items: center;
+  color: var(--hot);
+  font-weight: 800;
+  font-size: 13px;
+  flex: none;
+}
+.admin-shell .uinfo strong {
+  display: block;
+  font-size: 13.5px;
+}
+.admin-shell .uinfo small {
+  color: var(--muted2);
+  font-size: 12px;
+}
+.admin-shell .dt {
+  white-space: nowrap;
+}
+.admin-shell .dt small {
+  color: var(--muted2);
+  display: block;
+  font-size: 11px;
+}
+.admin-shell .venc {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-shell .venc small {
+  display: block;
+  color: var(--muted2);
+  font-size: 11px;
+  font-weight: 400;
+}
+.admin-shell .venc.warn {
+  color: var(--gold);
+}
+.admin-shell .venc.exp {
+  color: var(--red);
+}
+.admin-shell .cursos {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.admin-shell .toggle {
+  width: 42px;
+  height: 23px;
+  border-radius: 20px;
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.admin-shell .toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+}
+.admin-shell .toggle.on {
+  background: var(--green);
+}
+.admin-shell .toggle.on::after {
+  right: 2px;
+}
+.admin-shell .toggle.off {
+  background: var(--red);
+}
+.admin-shell .toggle.off::after {
+  left: 2px;
+}
+.admin-shell .acts {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.admin-shell .iconbtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: #161213;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+.admin-shell .iconbtn:hover {
+  border-color: var(--hot);
+  color: var(--hot);
+}
+
+@media (max-width: 900px) {
+  .admin-shell .hide {
+    display: none;
+  }
+}
