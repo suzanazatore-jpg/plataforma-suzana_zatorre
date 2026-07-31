@@ -1,0 +1,246 @@
+.admin-shell {
+  --green: #37c26a;
+  --red: #e0403f;
+  --gold: #f5b301;
+}
+
+.admin-shell .stu-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 8px;
+}
+.admin-shell .stu-head .ava {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #1c1618;
+  display: grid;
+  place-items: center;
+  color: var(--muted2);
+  flex: none;
+}
+.admin-shell .stu-head h1 {
+  margin: 0;
+  font-size: 19px;
+}
+.admin-shell .stu-head small {
+  color: var(--muted2);
+  font-size: 13px;
+}
+.admin-shell .stu-head .st {
+  margin-left: auto;
+  text-align: right;
+  color: var(--muted2);
+  font-size: 12px;
+}
+.admin-shell .stu-head .st b {
+  display: block;
+  color: #fff;
+  font-size: 15px;
+}
+
+.admin-shell .tabs {
+  display: flex;
+  gap: 22px;
+  border-bottom: 1px solid var(--line);
+  margin: 22px 0 20px;
+}
+.admin-shell .tabs a {
+  padding: 0 0 12px;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+.admin-shell .tabs a.on {
+  color: var(--hot);
+  border-bottom: 2px solid var(--hot);
+}
+
+.admin-shell .acc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.admin-shell .acc-head h2 {
+  font-size: 17px;
+  margin: 0;
+}
+.admin-shell .acc-head p {
+  color: var(--muted2);
+  font-size: 12.5px;
+  margin: 4px 0 0;
+  max-width: 520px;
+}
+.admin-shell .bulk {
+  display: flex;
+  gap: 10px;
+}
+.admin-shell .btn-ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  border-radius: 20px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.admin-shell .courses {
+  margin-top: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.admin-shell .crow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-shell .crow:last-child {
+  border-bottom: 0;
+}
+.admin-shell .crow .thumb {
+  width: 92px;
+  height: 52px;
+  border-radius: 8px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px solid var(--line);
+}
+.admin-shell .crow .thumb span {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #8a807c;
+  text-transform: uppercase;
+  padding: 3px;
+  letter-spacing: 0.05em;
+}
+.admin-shell .t-pk {
+  background: linear-gradient(135deg, #4a0f22, #240712);
+}
+.admin-shell .t-gd {
+  background: linear-gradient(135deg, #4a3708, #241a04);
+}
+.admin-shell .t-gn {
+  background: linear-gradient(135deg, #123d1e, #0b2413);
+}
+.admin-shell .t-nt {
+  background: linear-gradient(135deg, #1a1315, #0d0a0b);
+}
+.admin-shell .crow .info {
+  flex: 1;
+  min-width: 0;
+}
+.admin-shell .crow .info h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+.admin-shell .crow .info small {
+  color: var(--muted2);
+  font-size: 12px;
+}
+.admin-shell .crow .state {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  flex: none;
+}
+.admin-shell .state.lib {
+  color: var(--green);
+  background: rgba(55, 194, 106, 0.12);
+}
+.admin-shell .state.blo {
+  color: var(--muted2);
+  background: #1c1618;
+}
+.admin-shell .courses .toggle {
+  width: 46px;
+  height: 25px;
+  border-radius: 20px;
+  position: relative;
+  flex: none;
+  cursor: pointer;
+}
+.admin-shell .courses .toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  transition: 0.15s;
+}
+.admin-shell .courses .toggle.on {
+  background: var(--green);
+}
+.admin-shell .courses .toggle.on::after {
+  right: 2px;
+}
+.admin-shell .courses .toggle.off {
+  background: #3a3335;
+}
+.admin-shell .courses .toggle.off::after {
+  left: 2px;
+}
+
+.admin-shell .foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-shell .summary {
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-shell .summary b {
+  color: #fff;
+}
+.admin-shell .btn-pink-sq {
+  background: var(--hot);
+  border: 0;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  border-radius: 9px;
+  padding: 12px 26px;
+  cursor: pointer;
+}
+.admin-shell .ac-note {
+  background: rgba(47, 128, 237, 0.12);
+  border: 1px solid rgba(47, 128, 237, 0.3);
+  color: #9dc2f0;
+  font-size: 12.5px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-top: 22px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+.admin-shell .ac-note svg {
+  flex: none;
+  margin-top: 1px;
+}
