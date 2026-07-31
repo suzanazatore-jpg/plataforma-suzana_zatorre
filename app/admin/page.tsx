@@ -43,7 +43,7 @@ export default function AdminPage() {
                 <p>Crie cursos, módulos e aulas com vídeo e materiais.</p>
               </div>
             </Link>
-            <Link className="acard" href="#">
+            <Link className="acard" href="/admin/termos">
               <span className="ic"><FileText size={24} /></span>
               <div>
                 <h3>Termos de Uso</h3>
@@ -134,7 +134,7 @@ export default function AdminPage() {
                 <p>Ajuste o visual da área de membros com o seu estilo.</p>
               </div>
             </Link>
-            <Link className="acard" href="#">
+            <Link className="acard" href="/admin/termos">
               <span className="ic"><FileText size={24} /></span>
               <div>
                 <h3>Termos de Uso</h3>
