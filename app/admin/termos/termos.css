@@ -1,0 +1,24 @@
+.admin-shell {
+  --green: #37c26a;
+}
+
+.admin-shell .blk-title { font-size: 22px; font-weight: 800; margin: 6px 0 4px; }
+.admin-shell .blk-sub { color: var(--muted2); font-size: 13px; margin: 0 0 18px; }
+.admin-shell .btn-pink { background: var(--hot); border: 0; color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; border-radius: 9px; padding: 11px 20px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.admin-shell .termos-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.admin-shell .termos-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+.admin-shell .tt-left { display: flex; align-items: center; gap: 12px; }
+.admin-shell .tt-ic { width: 42px; height: 42px; border-radius: 10px; background: #221a1c; color: var(--hot); display: grid; place-items: center; flex: none; }
+.admin-shell .tt-left strong { display: block; font-size: 14.5px; }
+.admin-shell .tt-left span { font-size: 12px; color: var(--muted2); }
+.admin-shell .tt-toggle { display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.admin-shell .toggle { width: 42px; height: 23px; border-radius: 20px; position: relative; display: inline-block; flex: none; }
+.admin-shell .toggle::after { content: ''; position: absolute; top: 2px; width: 19px; height: 19px; border-radius: 50%; background: #fff; }
+.admin-shell .toggle.on { background: var(--green); }
+.admin-shell .toggle.on::after { right: 2px; }
+
+.admin-shell .termos-editor { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 16px; color: #ece6e4; font-family: inherit; font-size: 13.5px; line-height: 1.6; resize: vertical; min-height: 320px; }
+.admin-shell .termos-editor:focus { outline: none; border-color: rgba(255, 46, 99, 0.5); }
+.admin-shell .termos-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.admin-shell .termos-note { margin-top: 18px; background: rgba(47, 128, 237, 0.1); border: 1px solid rgba(47, 128, 237, 0.28); color: #9dc2f0; font-size: 12.5px; border-radius: 10px; padding: 12px 16px; line-height: 1.5; }
