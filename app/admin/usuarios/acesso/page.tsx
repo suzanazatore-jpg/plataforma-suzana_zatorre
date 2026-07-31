@@ -17,7 +17,7 @@ export default function AcessoCursosPage() {
 
   return (
     <>
-      <div className="crumb">⚙ Administrador › Usuários › Ana Carolina › Acesso aos Cursos</div>
+      <div className="crumb">⚙ Administrador › <Link href="/admin/usuarios" style={{ color: 'inherit', textDecoration: 'underline' }}>Usuários</Link> › Ana Carolina › Acesso aos Cursos</div>
 
       <div className="pad">
         <div className="stu-head">
