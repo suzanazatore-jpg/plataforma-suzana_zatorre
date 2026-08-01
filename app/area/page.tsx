@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
   BookOpen,
   Headphones,
@@ -10,26 +11,23 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { supportUrl } from '@/lib/course';
+import { getEnrolledCourses, getPublishedCourses } from '@/lib/supabase/data';
+import { getCurrentStudent } from '@/lib/supabase/session';
 import './area-home.css';
 
-// MODO DE CONSTRUÇÃO: área aberta, sem login e sem Supabase.
-// A aluna e os cursos abaixo são apenas exemplos, para você ver e ajustar o visual.
-// Quando a plataforma estiver pronta, restauramos a versão com login de verdade.
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
-export default function MemberAreaPage() {
-  const student = {
-    displayName: 'Suzana',
-    profile: { role: 'admin' as const }
-  };
+export default async function MemberAreaPage() {
+  const student = await getCurrentStudent();
+  if (!student) redirect('/?erro=login');
+
   const isAdmin = student.profile?.role === 'admin';
   const initial = student.displayName.charAt(0).toUpperCase();
-
-  // Cursos de exemplo — ainda não levam a lugar nenhum. Ligamos os reais no próximo passo.
-  const courses = [
-    { id: '1', icon: BookOpen, href: '#', eyebrow: 'Curso', title: 'Curso de Vendas', duration: '12 aulas' },
-    { id: '2', icon: PlayCircle, href: '#', eyebrow: 'Curso', title: 'Aulas Extras', duration: 'Em breve' }
-  ];
+  const courses = isAdmin
+    ? await getPublishedCourses()
+    : await getEnrolledCourses();
 
   return (
     <div className="member-home">
