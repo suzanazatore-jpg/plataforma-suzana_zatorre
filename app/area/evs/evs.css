@@ -157,7 +157,11 @@
 }
 
 .ep-tabs span,
-.ep-tabs a {
+.ep-tabs a,
+.ep-tabs button {
+  appearance: none;
+  background: transparent;
+  border: 0;
   padding: 0 0 12px;
   color: var(--hg-muted);
   font-weight: 800;
@@ -167,7 +171,8 @@
 }
 
 .ep-tabs span.on,
-.ep-tabs a.on {
+.ep-tabs a.on,
+.ep-tabs button.on {
   color: var(--hg-hot);
   border-bottom: 2px solid var(--hg-hot);
 }
@@ -200,7 +205,9 @@
   gap: 8px;
 }
 
-.ep-mlist a {
+.ep-mlist a,
+.ep-mlist button {
+  appearance: none;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -214,11 +221,13 @@
   text-decoration: none;
 }
 
-.ep-mlist a:hover {
+.ep-mlist a:hover,
+.ep-mlist button:hover {
   border-color: var(--hg-hot);
 }
 
-.ep-mlist a svg {
+.ep-mlist a svg,
+.ep-mlist button svg {
   color: var(--hg-hot);
   flex: none;
 }

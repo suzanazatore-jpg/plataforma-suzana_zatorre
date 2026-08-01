@@ -19,6 +19,8 @@ import { getEvsLessonMaterials, getEvsLessons, getEvsMaterials } from '@/lib/sup
 import { getCurrentStudent, hasActiveEnrollment } from '@/lib/supabase/session';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { logoutStudent } from '@/app/actions/auth';
+import { CourseTabs } from '@/app/area/course-tabs';
+import { MaterialDownload } from '@/app/area/material-download';
 import './evs.css';
 
 export const dynamic = 'force-dynamic';
@@ -200,11 +202,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             )}
           </div>
 
-          <div className="ep-tabs">
-            <a className={!commentsOpen ? 'on' : ''} href={lessonHref}>Informações</a>
-            <a className={commentsOpen ? 'on' : ''} href={`${lessonHref}&tab=comentarios`}>Comentários</a>
-          </div>
-          {commentsOpen ? <section className="ep-comments">
+          <CourseTabs initiallyOpen={commentsOpen} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
             <div className="ep-comment-list">
               {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>
@@ -217,7 +215,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
               <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
               <button type="submit">Publicar comentário</button>
             </form> : null}
-          </section> : <p className="ep-desc">{currentLesson.description}</p>}
+          </section>} />
 
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/evs?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>
@@ -241,10 +239,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             {lessonMaterials.length ? (
               <div className="ep-mlist">
                 {lessonMaterials.map((material) => (
-                  <a href={material.url} key={material.id || material.title}>
-                    <Download size={16} />
-                    <span>{material.title}</span>
-                  </a>
+                  <MaterialDownload href={material.url} title={material.title} key={material.id || material.title} />
                 ))}
               </div>
             ) : (
@@ -285,10 +280,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
               </div>
               <div className="ep-mlist ep-mlist-panel">
                 {bonuses.map((bonus) => (
-                  <a href={bonus.url} key={bonus.title}>
-                    <Download size={16} />
-                    <span>{bonus.title}</span>
-                  </a>
+                  <MaterialDownload href={bonus.url} title={bonus.title} key={bonus.title} />
                 ))}
               </div>
             </div>
