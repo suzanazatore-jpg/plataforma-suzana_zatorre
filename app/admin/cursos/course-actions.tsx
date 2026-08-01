@@ -144,6 +144,14 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover }:
     if (!valores[0] || !valores[1]) { window.alert('Título e código interno são obrigatórios.'); return; }
     const publicada = window.confirm('Deixar esta aula publicada?');
     const dados = { id: aula?.id, courseId, moduleId, title: valores[0], slug: valores[1], description: valores[2], videoUrl: valores[3], thumbnailUrl: aula?.thumbnail_url || '', duration: valores[4], publicada, sortOrder: aula?.sort_order };
+
+    // Uma aula nova precisa ser salva antes de qualquer upload opcional.
+    // Assim, cancelar ou falhar a thumbnail nunca faz o cadastro da aula desaparecer.
+    if (!aula) {
+      await concluir(dados);
+      return;
+    }
+
     const porArquivo = window.confirm('Clique em OK para subir uma thumbnail JPG ou PNG do computador.\n\nClique em Cancelar para continuar usando um link.');
     if (porArquivo) { pendente.current = dados; thumbInput.current?.click(); return; }
     const thumbnailUrl = window.prompt('Link da thumbnail:', aula?.thumbnail_url || '');
