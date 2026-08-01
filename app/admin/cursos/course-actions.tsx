@@ -170,14 +170,25 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover }:
     } finally { setBusy(false); pendente.current = null; if (thumbInput.current) thumbInput.current.value = ''; }
   }
 
+  function selecionarThumbnail() {
+    if (!aula || busy) return;
+    pendente.current = {
+      id: aula.id, courseId, moduleId, title: aula.title, slug: aula.slug,
+      description: aula.description, videoUrl: aula.video_url,
+      thumbnailUrl: aula.thumbnail_url, duration: aula.duration_label,
+      publicada: aula.is_published, sortOrder: aula.sort_order
+    };
+    thumbInput.current?.click();
+  }
+
   async function del() { if (!aula || !window.confirm(`Apagar a aula ${aula.title}?`)) return; const r = await apagar(aula.id); window.alert(r.mensagem); if (r.ok) router.refresh(); }
   async function move(direcao: 'cima' | 'baixo') { if (!aula || busy) return; setBusy(true); try { const r = await mover(aula.id, moduleId, direcao); if (!r.ok) window.alert(r.mensagem); if (r.ok) router.refresh(); } finally { setBusy(false); } }
 
   if (!aula) return <><input ref={thumbInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirThumbnail(e.target.files?.[0])} /><button onClick={abrir} disabled={busy}><Plus size={14} /> {busy ? 'Salvando...' : 'Adicionar aula neste módulo'}</button></>;
-  return <><input ref={thumbInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirThumbnail(e.target.files?.[0])} /><span className="iconbtn" title="Subir posição" onClick={() => move('cima')}><ChevronUp size={14} /></span><span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span><span className="iconbtn" title="Editar" onClick={abrir}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></>;
+  return <><input ref={thumbInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirThumbnail(e.target.files?.[0])} /><button className="btn-ghost" type="button" onClick={selecionarThumbnail} disabled={busy}><Image size={14} /> {busy ? 'Enviando...' : 'Thumbnail'}</button><span className="iconbtn" title="Subir posição" onClick={() => move('cima')}><ChevronUp size={14} /></span><span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span><span className="iconbtn" title="Editar" onClick={abrir}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></>;
 }
 
-export function MaterialButton({ courseId, lessonId, salvar }: { courseId: string; lessonId: string; salvar: (d: { courseId: string; lessonId: string; title: string; fileUrl: string }) => Promise<Resultado> }) {
+export function MaterialButton({ courseId, lessonId, salvar, label = 'Material' }: { courseId: string; lessonId: string | null; salvar: (d: { courseId: string; lessonId: string | null; title: string; fileUrl: string }) => Promise<Resultado>; label?: string }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -197,12 +208,12 @@ export function MaterialButton({ courseId, lessonId, salvar }: { courseId: strin
     setBusy(true);
     try {
       const safe = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
-      const path = `${courseId}/${lessonId}/${Date.now()}-${safe}`;
+      const path = `${courseId}/${lessonId || 'extras'}/${Date.now()}-${safe}`;
       const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: 'application/pdf', upsert: false });
       if (error) { window.alert(`Não foi possível subir o PDF: ${error.message}`); return; }
       const r = await salvar({ courseId, lessonId, title, fileUrl: `storage://course-materials/${path}` });
       window.alert(r.mensagem); if (r.ok) router.refresh();
     } finally { setBusy(false); if (input.current) input.current.value = ''; }
   }
-  return <><input ref={input} type="file" accept=".pdf,application/pdf" hidden onChange={(e) => subirPdf(e.target.files?.[0])} /><button className="btn-ghost" onClick={abrir} disabled={busy}><Upload size={14} /> {busy ? 'Enviando...' : 'Material'}</button></>;
+  return <><input ref={input} type="file" accept=".pdf,application/pdf" hidden onChange={(e) => subirPdf(e.target.files?.[0])} /><button className="btn-ghost" onClick={abrir} disabled={busy}><Upload size={14} /> {busy ? 'Enviando...' : label}</button></>;
 }
