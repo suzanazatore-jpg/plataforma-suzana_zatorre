@@ -26,6 +26,8 @@ export default async function PreviewCurso({ searchParams }: { searchParams?: { 
   const lessons = (modules || []).flatMap((m: any) => (m.lessons || []).map((l: any) => ({ ...l, moduleTitle: m.title })));
   const current = lessons.find((l: any) => l.id === searchParams?.aula) || lessons[0];
   const materials = current ? await Promise.all((current.materials || []).map(async (m: any) => ({ ...m, url: await resolveMaterialUrl(db, m.file_url) }))) : [];
+  const { data: courseExtraRows } = await db.from('materials').select('id,title,file_url,sort_order').eq('course_id', id).is('lesson_id', null).eq('is_published', true).order('sort_order');
+  const courseExtras = await Promise.all((courseExtraRows || []).map(async (m: any) => ({ ...m, url: await resolveMaterialUrl(db, m.file_url) })));
 
   return <div className="ep-page">
     <header className="ep-bar">
@@ -43,6 +45,8 @@ export default async function PreviewCurso({ searchParams }: { searchParams?: { 
       <div className="ep-materials"><h3>Materiais desta aula</h3>{materials.length ? <div className="ep-mlist">{materials.map((m:any)=><a href={m.url} key={m.id} target="_blank" rel="noreferrer"><Download size={16}/><span>{m.title}</span></a>)}</div> : <p className="ep-empty-note">Nenhum material de apoio cadastrado para esta aula.</p>}</div>
     </div><aside><div className="ep-side-card"><div className="ep-side-head"><span className="ep-chk"><CheckCircle2 size={16}/></span>{course.title}</div><div className="ep-lessonlist">
       {lessons.length ? lessons.map((l:any,i:number)=><Link className={`ep-li ${l.id===current?.id?'current':''}`} href={`/preview/curso?id=${id}&aula=${l.id}`} key={l.id}><span className="ep-dot"><CheckCircle2 size={13}/></span><span>{i+1}. {l.title}</span></Link>) : <p className="ep-empty-note">Cadastre uma aula para visualizar o curso.</p>}
-    </div></div></aside></div>
+    </div></div>
+    {courseExtras.length ? <div className="ep-side-card ep-materials-panel"><div className="ep-side-head"><span className="ep-chk"><Download size={16}/></span>Material Extra</div><div className="ep-mlist ep-mlist-panel">{courseExtras.map((m:any)=><a href={m.url} key={m.id} target="_blank" rel="noreferrer"><Download size={16}/><span>{m.title}</span></a>)}</div></div> : null}
+    </aside></div>
   </div>;
 }
