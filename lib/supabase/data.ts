@@ -1,6 +1,7 @@
 import { BookOpen, CheckCircle2, ClipboardCheck, PlayCircle } from 'lucide-react';
 import { bonuses, lessons, platformCourses } from '@/lib/course';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { resolveMaterialUrl } from '@/lib/supabase/material-url';
 
 /**
  * IMPORTANTE: todas as leituras usam o cliente de servidor autenticado
@@ -117,12 +118,12 @@ export async function getEvsMaterials() {
 
   if (error || !data?.length) return bonuses;
 
-  return data.map((material, index) => ({
+  return Promise.all(data.map(async (material, index) => ({
     title: material.title,
     description: material.description || '',
     icon: index === 0 ? ClipboardCheck : index === 1 ? CheckCircle2 : BookOpen,
-    url: material.file_url || '#'
-  }));
+    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url) : '#'
+  })));
 }
 
 export async function getEvsLessonMaterials(lessonSlug: string) {
@@ -138,9 +139,9 @@ export async function getEvsLessonMaterials(lessonSlug: string) {
 
   if (error || !data?.length) return [];
 
-  return data.map((material) => ({
+  return Promise.all(data.map(async (material) => ({
     title: material.title,
     description: material.description || '',
-    url: material.file_url || '#'
-  }));
+    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url) : '#'
+  })));
 }
