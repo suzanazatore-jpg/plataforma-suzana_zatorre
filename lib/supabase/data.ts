@@ -17,6 +17,7 @@ function mapCourse(course: {
   title: string;
   subtitle: string | null;
   description: string | null;
+  cover_image_url: string | null;
 }) {
   return {
     id: course.slug,
@@ -24,6 +25,7 @@ function mapCourse(course: {
     eyebrow: course.subtitle || 'curso',
     title: course.title,
     description: course.description || '',
+    coverImageUrl: course.cover_image_url || '',
     duration: course.slug === 'evs' ? `${lessons.length} aulas + bonus` : 'Acessar curso',
     icon: PlayCircle,
     accent: '#e6325a',
@@ -55,7 +57,7 @@ export async function getEnrolledCourses() {
 
   const { data, error } = await supabase
     .from('courses')
-    .select('id, slug, title, subtitle, description, sort_order')
+    .select('id, slug, title, subtitle, description, cover_image_url, sort_order')
     .in('id', courseIds)
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
@@ -74,7 +76,7 @@ export async function getPublishedCourses() {
 
   const { data, error } = await supabase
     .from('courses')
-    .select('id, slug, title, subtitle, description, sort_order')
+    .select('id, slug, title, subtitle, description, cover_image_url, sort_order')
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
