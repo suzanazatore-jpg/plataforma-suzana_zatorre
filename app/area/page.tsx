@@ -106,7 +106,15 @@ export default async function MemberAreaPage() {
             {courses.map((course) => {
               const Icon = course.icon;
               return (
-                <a className="mh-card" key={course.id} href={course.href}>
+                <a
+                  className="mh-card"
+                  key={course.id}
+                  href={
+                    isAdmin && 'dbId' in course
+                      ? `/preview/curso?id=${course.dbId}`
+                      : course.href
+                  }
+                >
                   <span className="play">
                     <PlayCircle size={18} />
                   </span>
