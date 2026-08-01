@@ -16,6 +16,26 @@ export const fetchCache = 'force-no-store';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
 
+async function addLessonComment(formData: FormData) {
+  'use server';
+  const lessonId = String(formData.get('lessonId') || '');
+  const courseSlug = String(formData.get('courseSlug') || '');
+  const body = String(formData.get('body') || '').trim();
+  if (!UUID.test(lessonId) || !courseSlug || !body || body.length > 1000) return;
+
+  const supabase = createSupabaseServerClient();
+  if (!supabase) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+
+  await supabase.from('lesson_comments').insert({
+    lesson_id: lessonId,
+    profile_id: auth.user.id,
+    body
+  });
+  revalidatePath(`/area/${courseSlug}`);
+}
+
 async function toggleLessonProgress(formData: FormData) {
   'use server';
   const lessonId = String(formData.get('lessonId') || '');
@@ -66,7 +86,7 @@ export default async function CoursePage({
   searchParams
 }: {
   params: { curso: string };
-  searchParams?: { aula?: string };
+  searchParams?: { aula?: string; tab?: string };
 }) {
   const student = await getCurrentStudent();
   if (!student) redirect('/?erro=login');
@@ -134,7 +154,7 @@ export default async function CoursePage({
     .order('sort_order');
   const lessonMaterials = await Promise.all((lessonMaterialRows || []).map(async (material: any) => ({
     ...material,
-    url: await resolveMaterialUrl(admin, material.file_url)
+    url: await resolveMaterialUrl(admin, material.file_url, material.title)
   })));
 
   const { data: extraRows } = await admin
@@ -146,8 +166,24 @@ export default async function CoursePage({
     .order('sort_order');
   const extras = await Promise.all((extraRows || []).map(async (material: any) => ({
     ...material,
-    url: await resolveMaterialUrl(admin, material.file_url)
+    url: await resolveMaterialUrl(admin, material.file_url, material.title)
   })));
+  const { data: commentRows } = await admin
+    .from('lesson_comments')
+    .select('id,body,created_at,profile_id')
+    .eq('lesson_id', current.id)
+    .order('created_at', { ascending: true });
+  const commenterIds = Array.from(new Set((commentRows || []).map((comment: any) => comment.profile_id)));
+  const { data: commenterProfiles } = commenterIds.length
+    ? await admin.from('profiles').select('id,name').in('id', commenterIds)
+    : { data: [] as any[] };
+  const commenterNames = new Map((commenterProfiles || []).map((profile: any) => [profile.id, profile.name || 'Aluna']));
+  const comments = (commentRows || []).map((comment: any) => ({
+    ...comment,
+    author: commenterNames.get(comment.profile_id) || 'Aluna'
+  }));
+  const commentsOpen = searchParams?.tab === 'comentarios';
+  const lessonHref = `/area/${course.slug}?aula=${current.id}`;
   const initial = student.displayName.charAt(0).toUpperCase();
 
   return (
@@ -164,8 +200,25 @@ export default async function CoursePage({
           <div className="ep-video">
             {current.video_url ? <iframe src={current.video_url} title={current.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <button type="button" className="ep-play" aria-label="Aula sem vídeo"><Play size={28} fill="currentColor" /></button>}
           </div>
-          <div className="ep-tabs"><span className="on">Informações</span><span>Comentários</span></div>
-          <p className="ep-desc">{current.description || course.description || course.subtitle || 'Curso sem descrição.'}</p>
+          <div className="ep-tabs">
+            <Link className={!commentsOpen ? 'on' : ''} href={lessonHref}>Informações</Link>
+            <Link className={commentsOpen ? 'on' : ''} href={`${lessonHref}&tab=comentarios`}>Comentários</Link>
+          </div>
+          {commentsOpen ? <section className="ep-comments">
+            <div className="ep-comment-list">
+              {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
+                <strong>{comment.author}</strong>
+                <time>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
+                <p>{comment.body}</p>
+              </article>) : <p className="ep-empty-note">Ainda não há comentários nesta aula. Seja a primeira a comentar.</p>}
+            </div>
+            <form action={addLessonComment} className="ep-comment-form">
+              <input type="hidden" name="lessonId" value={current.id} />
+              <input type="hidden" name="courseSlug" value={course.slug} />
+              <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
+              <button type="submit">Publicar comentário</button>
+            </form>
+          </section> : <p className="ep-desc">{current.description || course.description || course.subtitle || 'Curso sem descrição.'}</p>}
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/${course.slug}?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>Aula anterior</Link>
             {!isAdmin ? <form action={toggleLessonProgress}>
@@ -175,14 +228,14 @@ export default async function CoursePage({
             </form> : <button className="ep-complete-button" type="button">Visualização da administradora</button>}
             <Link className={`ep-nav-button ${!nextLesson ? 'disabled' : ''}`} href={nextLesson ? `/area/${course.slug}?aula=${nextLesson.id}` : '#'} aria-disabled={!nextLesson}>Próxima aula</Link>
           </div>
-          <div className="ep-materials"><h3>Materiais desta aula</h3>{lessonMaterials.length ? <div className="ep-mlist">{lessonMaterials.map((material: any) => <a href={material.url} key={material.id} target="_blank" rel="noreferrer"><Download size={16} /><span>{material.title}</span></a>)}</div> : <p className="ep-empty-note">Nenhum material de apoio cadastrado para esta aula.</p>}</div>
+          <div className="ep-materials"><h3>Materiais desta aula</h3>{lessonMaterials.length ? <div className="ep-mlist">{lessonMaterials.map((material: any) => <a href={material.url} key={material.id} download><Download size={16} /><span>{material.title}</span></a>)}</div> : <p className="ep-empty-note">Nenhum material de apoio cadastrado para esta aula.</p>}</div>
         </div>
 
         <aside>
           <div className="ep-side-card"><div className="ep-side-head"><span className="ep-chk"><CheckCircle2 size={16} /></span>{course.title}</div><div className="ep-lessonlist">
             {lessons.map((lesson: any, index: number) => <Link className={`ep-li ${lesson.id === current.id ? 'current' : ''} ${completedIds.has(lesson.id) ? 'done' : ''}`} href={`/area/${course.slug}?aula=${lesson.id}`} key={lesson.id}><span className="ep-dot"><CheckCircle2 size={13} /></span><span>{index + 1}. {lesson.title}</span></Link>)}
           </div></div>
-          {extras.length ? <div className="ep-side-card ep-materials-panel"><div className="ep-side-head"><span className="ep-chk"><Download size={16} /></span>Material Extra</div><div className="ep-mlist ep-mlist-panel">{extras.map((material: any) => <a href={material.url} key={material.id} target="_blank" rel="noreferrer"><Download size={16} /><span>{material.title}</span></a>)}</div></div> : null}
+          {extras.length ? <div className="ep-side-card ep-materials-panel"><div className="ep-side-head"><span className="ep-chk"><Download size={16} /></span>Material Extra</div><div className="ep-mlist ep-mlist-panel">{extras.map((material: any) => <a href={material.url} key={material.id} download><Download size={16} /><span>{material.title}</span></a>)}</div></div> : null}
         </aside>
       </div>
 
