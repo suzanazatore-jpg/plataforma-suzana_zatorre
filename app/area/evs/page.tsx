@@ -201,8 +201,8 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
           </div>
 
           <div className="ep-tabs">
-            <Link className={!commentsOpen ? 'on' : ''} href={lessonHref}>Informações</Link>
-            <Link className={commentsOpen ? 'on' : ''} href={`${lessonHref}&tab=comentarios`}>Comentários</Link>
+            <a className={!commentsOpen ? 'on' : ''} href={lessonHref}>Informações</a>
+            <a className={commentsOpen ? 'on' : ''} href={`${lessonHref}&tab=comentarios`}>Comentários</a>
           </div>
           {commentsOpen ? <section className="ep-comments">
             <div className="ep-comment-list">
@@ -241,7 +241,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             {lessonMaterials.length ? (
               <div className="ep-mlist">
                 {lessonMaterials.map((material) => (
-                  <a href={material.url} key={material.title} download>
+                  <a href={material.url} key={material.id || material.title}>
                     <Download size={16} />
                     <span>{material.title}</span>
                   </a>
@@ -285,7 +285,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
               </div>
               <div className="ep-mlist ep-mlist-panel">
                 {bonuses.map((bonus) => (
-                  <a href={bonus.url} key={bonus.title} download>
+                  <a href={bonus.url} key={bonus.title}>
                     <Download size={16} />
                     <span>{bonus.title}</span>
                   </a>

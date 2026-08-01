@@ -1,7 +1,6 @@
 import { BookOpen, CheckCircle2, ClipboardCheck, PlayCircle } from 'lucide-react';
 import { bonuses, lessons, platformCourses } from '@/lib/course';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { resolveMaterialUrl } from '@/lib/supabase/material-url';
 
 /**
  * IMPORTANTE: todas as leituras usam o cliente de servidor autenticado
@@ -116,7 +115,7 @@ export async function getEvsMaterials() {
 
   const { data, error } = await supabase
     .from('materials')
-    .select('title, description, file_url, sort_order')
+    .select('id, title, description, file_url, sort_order')
     .eq('is_published', true)
     .is('lesson_id', null)
     .order('sort_order', { ascending: true });
@@ -124,10 +123,11 @@ export async function getEvsMaterials() {
   if (error || !data?.length) return bonuses;
 
   return Promise.all(data.map(async (material, index) => ({
+    id: material.id,
     title: material.title,
     description: material.description || '',
     icon: index === 0 ? ClipboardCheck : index === 1 ? CheckCircle2 : BookOpen,
-    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url, material.title) : '#'
+    url: `/api/materials/${material.id}/download`
   })));
 }
 
@@ -137,7 +137,7 @@ export async function getEvsLessonMaterials(lessonSlug: string) {
 
   const { data, error } = await supabase
     .from('materials')
-    .select('title, description, file_url, sort_order, lessons!inner(slug)')
+    .select('id, title, description, file_url, sort_order, lessons!inner(slug)')
     .eq('is_published', true)
     .eq('lessons.slug', lessonSlug)
     .order('sort_order', { ascending: true });
@@ -145,8 +145,9 @@ export async function getEvsLessonMaterials(lessonSlug: string) {
   if (error || !data?.length) return [];
 
   return Promise.all(data.map(async (material) => ({
+    id: material.id,
     title: material.title,
     description: material.description || '',
-    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url, material.title) : '#'
+    url: `/api/materials/${material.id}/download`
   })));
 }
