@@ -1,132 +1,32 @@
 import Link from 'next/link';
-import { Plus, Pencil, Trash2, Play, Image } from 'lucide-react';
+import { Play } from 'lucide-react';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { CursoButtons, NovoModuloButton, ModuloActions, AulaActions, MaterialButton } from '../course-actions';
 import '../cursos.css';
 
-// MODO DE CONSTRUÇÃO: editar curso com módulos e aulas de exemplo.
-// Adicionar/editar/salvar ainda não gravam — ligamos com o Supabase depois.
-const modulos = [
-  {
-    nome: 'Módulo 1 — Fundamentos',
-    aulas: [
-      { titulo: 'Aula 1 — Boas-vindas', sub: 'Vídeo · Youtube', dur: '08:24', estado: 'pub' },
-      { titulo: 'Aula 2 — O método na prática', sub: 'Vídeo · Vimeo · 2 materiais', dur: '15:10', estado: 'pub' },
-      { titulo: 'Aula 3 — Exercício', sub: 'Sem vídeo ainda', dur: '—', estado: 'dr' }
-    ]
-  },
-  {
-    nome: 'Módulo 2 — Montando a equipe',
-    aulas: [
-      { titulo: 'Aula 1 — Quem contratar', sub: 'Vídeo · Bunny', dur: '12:03', estado: 'pub' }
-    ]
-  }
-];
+export const dynamic='force-dynamic';
+type Resultado={ok:boolean;mensagem:string};
+const UUID=/^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
+async function admin(){const s=createSupabaseServerClient(),db=createSupabaseAdminClient();if(!s||!db)return null;const{data}=await s.auth.getUser();if(!data.user)return null;const{data:p}=await db.from('profiles').select('role,status').eq('id',data.user.id).maybeSingle();return p?.role==='admin'&&p.status==='active'?db:null;}
+async function editarCurso(d:any):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{error}=await db.from('courses').update({title:d.title.trim(),subtitle:d.subtitle?.trim()||null,description:d.description?.trim()||null,slug:d.slug.trim().toLowerCase(),cover_image_url:d.cover_image_url?.trim()||null,sort_order:Number(d.sort_order)||0,is_published:Boolean(d.is_published)}).eq('id',d.id);if(error)return{ok:false,mensagem:'Não foi possível salvar o curso.'};revalidatePath('/admin/cursos');revalidatePath(`/admin/cursos/editar?id=${d.id}`);revalidatePath('/area');return{ok:true,mensagem:'Curso salvo com sucesso.'};}
+async function apagarCurso(id:string,c:string):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};if(c!=='APAGAR')return{ok:false,mensagem:'Confirmação incorreta. O curso não foi apagado.'};const{error}=await db.from('courses').delete().eq('id',id);if(error)return{ok:false,mensagem:'Não foi possível apagar o curso.'};revalidatePath('/admin/cursos');return{ok:true,mensagem:'Curso apagado com sucesso.'};}
+async function criarModulo(d:{courseId:string;title:string}):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{count}=await db.from('modules').select('*',{count:'exact',head:true}).eq('course_id',d.courseId);const{error}=await db.from('modules').insert({course_id:d.courseId,title:d.title,sort_order:(count||0)+1,is_published:true});if(error)return{ok:false,mensagem:'Não foi possível criar o módulo. Execute a atualização do banco.'};revalidatePath('/admin/cursos/editar');return{ok:true,mensagem:'Módulo criado com sucesso.'};}
+async function editarModulo(id:string,title:string):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{error}=await db.from('modules').update({title}).eq('id',id);revalidatePath('/admin/cursos/editar');return error?{ok:false,mensagem:'Não foi possível editar o módulo.'}:{ok:true,mensagem:'Módulo atualizado.'};}
+async function apagarModulo(id:string):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{error}=await db.from('modules').delete().eq('id',id);revalidatePath('/admin/cursos/editar');return error?{ok:false,mensagem:'Não foi possível apagar o módulo.'}:{ok:true,mensagem:'Módulo apagado.'};}
+async function salvarAula(d:any):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const payload={course_id:d.courseId,module_id:d.moduleId,title:d.title,slug:d.slug,description:d.description||null,video_url:d.videoUrl||null,thumbnail_url:d.thumbnailUrl||null,duration_label:d.duration||null,is_published:d.publicada};const q=d.id?db.from('lessons').update(payload).eq('id',d.id):db.from('lessons').insert(payload);const{error}=await q;if(error)return{ok:false,mensagem:error.message.includes('thumbnail_url')?'Antes, execute a atualização do banco no Supabase.':'Não foi possível salvar a aula.'};revalidatePath('/admin/cursos/editar');revalidatePath('/area');return{ok:true,mensagem:'Aula salva com sucesso.'};}
+async function apagarAula(id:string):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{error}=await db.from('lessons').delete().eq('id',id);revalidatePath('/admin/cursos/editar');return error?{ok:false,mensagem:'Não foi possível apagar a aula.'}:{ok:true,mensagem:'Aula apagada.'};}
+async function salvarMaterial(d:any):Promise<Resultado>{'use server';const db=await admin();if(!db)return{ok:false,mensagem:'Acesso administrativo necessário.'};const{error}=await db.from('materials').insert({course_id:d.courseId,lesson_id:d.lessonId,title:d.title,file_url:d.fileUrl,is_published:true,sort_order:0});revalidatePath('/admin/cursos/editar');return error?{ok:false,mensagem:'Não foi possível salvar o material. Execute a atualização do banco.'}:{ok:true,mensagem:'Material salvo com sucesso.'};}
 
-export default function EditarCursoPage() {
-  return (
-    <>
-      <div className="crumb">
-        ⚙ Administrador › <Link href="/admin/cursos" style={{ color: 'inherit', textDecoration: 'underline' }}>Cursos</Link> › EVS — Equipe que Vende Sozinha
-      </div>
-
-      <div className="pad">
-        <div className="course-head">
-          <div className="cthumb t-pk">
-            <span>EVS · Vende Sozinha</span>
-          </div>
-          <div>
-            <h2>EVS — Equipe que Vende Sozinha</h2>
-            <p>Curso principal da Academia. Método para a lojista montar uma equipe que vende sem depender só dela.</p>
-          </div>
-          <div className="hactions">
-            <button className="btn-ghost">
-              <Pencil size={14} /> Editar curso
-            </button>
-            <button className="btn-ghost">
-              <Image size={14} /> Capa
-            </button>
-          </div>
-        </div>
-
-        <div className="mods-head">
-          <h3>Módulos e Aulas</h3>
-          <button className="btn-pink">
-            <Plus size={16} /> Adicionar módulo
-          </button>
-        </div>
-
-        {modulos.map((m) => (
-          <div className="module" key={m.nome}>
-            <div className="mtop">
-              <span className="grip">⠿</span>
-              <span className="mname">{m.nome}</span>
-              <span className="mcount">{m.aulas.length} aula{m.aulas.length > 1 ? 's' : ''}</span>
-              <span className="mact">
-                <span className="iconbtn" title="Editar">
-                  <Pencil size={14} />
-                </span>
-                <span className="iconbtn" title="Remover">
-                  <Trash2 size={14} />
-                </span>
-              </span>
-            </div>
-
-            {m.aulas.map((a) => (
-              <div className="lesson" key={a.titulo}>
-                <span className="play">
-                  <Play size={15} />
-                </span>
-                <div className="lname">
-                  <b>{a.titulo}</b>
-                  <small>{a.sub}</small>
-                </div>
-                <span className="ldur">{a.dur}</span>
-                <span className={`lstate ${a.estado}`}>{a.estado === 'pub' ? 'Publicada' : 'Rascunho'}</span>
-                <span className="iconbtn">
-                  <Pencil size={14} />
-                </span>
-              </div>
-            ))}
-
-            <div className="addlesson">
-              <button>
-                <Plus size={14} /> Adicionar aula neste módulo
-              </button>
-            </div>
-          </div>
-        ))}
-
-        <button className="btn-ghost addmod">
-          <Plus size={14} /> Adicionar módulo
-        </button>
-
-        <div className="modal">
-          <div className="mh">
-            <h3>Nova aula</h3>
-            <p>Preencha os dados e conecte o vídeo da aula.</p>
-          </div>
-          <div className="mtabs">
-            <a className="on">Vídeo</a>
-            <a>Materiais</a>
-            <a>Liberação</a>
-          </div>
-          <div className="mbody">
-            <div className="field-lbl">Título da aula</div>
-            <div className="inp">Ex.: Como abordar o cliente</div>
-            <div className="field-lbl">De onde vem o vídeo?</div>
-            <div className="providers">
-              <span className="prov on">Youtube</span>
-              <span className="prov">Vimeo</span>
-              <span className="prov">Bunny</span>
-              <span className="prov">PandaVideo</span>
-            </div>
-            <div className="field-lbl" style={{ marginTop: '14px' }}>Link ou ID do vídeo</div>
-            <div className="inp">https://youtube.com/watch?v=...</div>
-            <button className="btn-pink">
-              <Plus size={16} /> Salvar aula
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
+export default async function Page({searchParams}:{searchParams?:{id?:string}}){const id=searchParams?.id||'';if(!UUID.test(id))redirect('/admin/cursos');const db=createSupabaseAdminClient();if(!db)return <div className="pad">Supabase não configurado.</div>;const{data:c}=await db.from('courses').select('id,title,slug,subtitle,description,cover_image_url,sort_order,is_published').eq('id',id).maybeSingle();if(!c)return <div className="pad">Curso não encontrado.</div>;const{data:mods,error}=await db.from('modules').select('id,title,description,sort_order,is_published,lessons(id,title,slug,description,video_url,thumbnail_url,duration_label,is_published,materials(id,title,file_url))').eq('course_id',id).order('sort_order').order('sort_order',{referencedTable:'lessons'});
+ const curso={...c,subtitle:c.subtitle||'',description:c.description||'',cover_image_url:c.cover_image_url||''};
+ return <><div className="crumb">⚙ Administrador › <Link href="/admin/cursos" style={{color:'inherit',textDecoration:'underline'}}>Cursos</Link> › {c.title}</div><div className="pad">
+  <div className="course-head"><div className="cthumb t-pk" style={c.cover_image_url?{backgroundImage:`url(${c.cover_image_url})`,backgroundSize:'cover',backgroundPosition:'center'}:{}}><span>{c.title}</span></div><div><h2>{c.title}</h2><p>{c.description||c.subtitle||'Curso sem descrição.'}</p></div><CursoButtons curso={curso} editar={editarCurso} apagar={apagarCurso}/></div>
+  <div className="mods-head"><h3>Módulos e Aulas</h3><NovoModuloButton cursoId={c.id} criar={criarModulo}/></div>
+  {error?<div className="module" style={{padding:20}}>As tabelas de módulos e aulas ainda precisam ser criadas no Supabase.</div>:(mods||[]).map((m:any)=><div className="module" key={m.id}><div className="mtop"><span className="grip">⠿</span><span className="mname">{m.title}</span><span className="mcount">{m.lessons?.length||0} aula{m.lessons?.length===1?'':'s'}</span><ModuloActions modulo={m} editar={editarModulo} apagar={apagarModulo}/></div>
+   {(m.lessons||[]).map((a:any)=><div className="lesson" key={a.id}><span className="play"><Play size={15}/></span><div className="lname"><b>{a.title}</b><small>{a.video_url?'Vídeo conectado':'Sem vídeo ainda'} · {a.materials?.length||0} materiais</small></div><span className="ldur">{a.duration_label||'—'}</span><span className={`lstate ${a.is_published?'pub':'dr'}`}>{a.is_published?'Publicada':'Rascunho'}</span><MaterialButton courseId={c.id} lessonId={a.id} salvar={salvarMaterial}/><AulaActions courseId={c.id} moduleId={m.id} aula={{...a,description:a.description||'',video_url:a.video_url||'',thumbnail_url:a.thumbnail_url||'',duration_label:a.duration_label||''}} salvar={salvarAula} apagar={apagarAula}/></div>)}
+   <div className="addlesson"><AulaActions courseId={c.id} moduleId={m.id} salvar={salvarAula} apagar={apagarAula}/></div></div>)}
+ </div></>;
 }
