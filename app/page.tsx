@@ -1,11 +1,59 @@
+'use client';
+
 import Link from 'next/link';
+import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, LockKeyhole, Mail } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import './login.css';
 
-// MODO DE CONSTRUÇÃO: o login está temporariamente desligado.
-// O botão "Entrar" leva direto para /area, sem checar e-mail/senha nem Supabase.
-// Quando a plataforma estiver pronta, basta restaurar a versão com login real.
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [entrando, setEntrando] = useState(false);
+
+  async function entrar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setMensagem('');
+
+    const supabase = createClient();
+    if (!supabase) {
+      setMensagem('A conexão da plataforma não está configurada.');
+      return;
+    }
+
+    setEntrando(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: senha
+    });
+
+    if (error || !data.user) {
+      setMensagem('E-mail ou senha incorretos. Confira e tente novamente.');
+      setEntrando(false);
+      return;
+    }
+
+    const { data: perfil } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    if (perfil?.status && perfil.status !== 'active') {
+      await supabase.auth.signOut();
+      setMensagem('Seu acesso está bloqueado. Fale com o suporte.');
+      setEntrando(false);
+      return;
+    }
+
+    router.replace(perfil?.role === 'admin' ? '/admin' : '/area');
+    router.refresh();
+  }
+
   return (
     <main className="login-page">
       <div className="login-bg" aria-hidden />
@@ -17,7 +65,13 @@ export default function LoginPage() {
         />
         <p className="login-kicker">Acesse sua área de membros</p>
 
-        <div className="login-form">
+        {mensagem && (
+          <p className="login-alert" role="alert">
+            {mensagem}
+          </p>
+        )}
+
+        <form className="login-form" onSubmit={entrar}>
           <label className="field-label">
             <div className="field">
               <Mail size={18} />
@@ -25,6 +79,9 @@ export default function LoginPage() {
                 type="email"
                 placeholder="Digite seu e-mail"
                 autoComplete="email"
+                value={email}
+                onChange={(evento) => setEmail(evento.target.value)}
+                required
               />
             </div>
           </label>
@@ -36,6 +93,9 @@ export default function LoginPage() {
                 type="password"
                 placeholder="Digite sua senha"
                 autoComplete="current-password"
+                value={senha}
+                onChange={(evento) => setSenha(evento.target.value)}
+                required
               />
             </div>
           </label>
@@ -44,10 +104,10 @@ export default function LoginPage() {
             Esqueci minha senha
           </Link>
 
-          <Link className="login-submit" href="/area">
-            Entrar <ArrowRight size={18} />
-          </Link>
-        </div>
+          <button className="login-submit" type="submit" disabled={entrando}>
+            {entrando ? 'Entrando...' : 'Entrar'} <ArrowRight size={18} />
+          </button>
+        </form>
       </section>
     </main>
   );
