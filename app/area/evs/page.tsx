@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -23,7 +24,53 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-export default async function EvsCoursePage() {
+const UUID = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
+
+async function toggleLessonProgress(formData: FormData) {
+  'use server';
+  const lessonId = String(formData.get('lessonId') || '');
+  if (!UUID.test(lessonId)) return;
+
+  const supabase = (await import('@/lib/supabase/server')).createSupabaseServerClient();
+  if (!supabase) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+
+  const { data: lesson } = await supabase
+    .from('lessons')
+    .select('id, course_id')
+    .eq('id', lessonId)
+    .eq('is_published', true)
+    .maybeSingle();
+  if (!lesson) return;
+
+  const { data: enrollment } = await supabase
+    .from('enrollments')
+    .select('id')
+    .eq('profile_id', auth.user.id)
+    .eq('course_id', lesson.course_id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (!enrollment) return;
+
+  const { data: existing } = await supabase
+    .from('lesson_progress')
+    .select('completed')
+    .eq('profile_id', auth.user.id)
+    .eq('lesson_id', lessonId)
+    .maybeSingle();
+  const completed = !existing?.completed;
+  await supabase.from('lesson_progress').upsert({
+    profile_id: auth.user.id,
+    lesson_id: lessonId,
+    completed,
+    completed_at: completed ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'profile_id,lesson_id' });
+  revalidatePath('/area/evs');
+}
+
+export default async function EvsCoursePage({ searchParams }: { searchParams?: { aula?: string } }) {
   const student = await getCurrentStudent();
   if (!student) {
     redirect('/?erro=login');
@@ -36,9 +83,23 @@ export default async function EvsCoursePage() {
 
   const lessons = await getEvsLessons();
   const bonuses = await getEvsMaterials();
-  const completed = 1;
-  const progress = Math.round((completed / lessons.length) * 100);
-  const currentLesson = lessons[0];
+  const supabase = (await import('@/lib/supabase/server')).createSupabaseServerClient();
+  const lessonIds = lessons.map((lesson: any) => lesson.dbId).filter(Boolean);
+  const { data: progressRows } = supabase && lessonIds.length
+    ? await supabase.from('lesson_progress').select('lesson_id, completed, updated_at').eq('profile_id', student.userId).in('lesson_id', lessonIds).order('updated_at', { ascending: false })
+    : { data: [] as any[] };
+  const completedIds = new Set((progressRows || []).filter((row: any) => row.completed).map((row: any) => row.lesson_id));
+  const completed = completedIds.size;
+  const progress = lessons.length ? Math.round((completed / lessons.length) * 100) : 0;
+  const lastLessonId = progressRows?.[0]?.lesson_id;
+  const currentLesson = lessons.find((lesson: any) => lesson.id === searchParams?.aula)
+    || lessons.find((lesson: any) => lesson.dbId === lastLessonId)
+    || lessons[0];
+  if (!currentLesson) redirect('/area');
+  const currentIndex = lessons.findIndex((lesson: any) => lesson.id === currentLesson.id);
+  const previousLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null;
+  const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null;
+  const currentCompleted = currentLesson.dbId ? completedIds.has(currentLesson.dbId) : false;
   const lessonMaterials = await getEvsLessonMaterials(currentLesson.id);
   const initial = student.displayName.charAt(0).toUpperCase();
   const hasRealVideo = Boolean(currentLesson.videoUrl && currentLesson.videoUrl !== '#');
@@ -57,7 +118,7 @@ export default async function EvsCoursePage() {
         <div className="ep-who">
           <span className="ep-dashes">
             {lessons.map((_, i) => (
-              <i key={i} className={i === 0 ? 'on' : ''} />
+              <i key={i} className={i === currentIndex ? 'on' : ''} />
             ))}
           </span>
           <span>Olá, {student.displayName}</span>
@@ -110,6 +171,23 @@ export default async function EvsCoursePage() {
           </div>
           <p className="ep-desc">{currentLesson.description}</p>
 
+          <div className="ep-course-actions">
+            <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/evs?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>
+              Aula anterior
+            </Link>
+            {currentLesson.dbId ? (
+              <form action={toggleLessonProgress}>
+                <input type="hidden" name="lessonId" value={currentLesson.dbId} />
+                <button className={`ep-complete-button ${currentCompleted ? 'completed' : ''}`} type="submit">
+                  {currentCompleted ? 'Aula concluída' : 'Marcar como concluída'}
+                </button>
+              </form>
+            ) : null}
+            <Link className={`ep-nav-button ${!nextLesson ? 'disabled' : ''}`} href={nextLesson ? `/area/evs?aula=${nextLesson.id}` : '#'} aria-disabled={!nextLesson}>
+              Próxima aula
+            </Link>
+          </div>
+
           <div className="ep-materials">
             <h3>Materiais desta aula</h3>
             {lessonMaterials.length ? (
@@ -136,15 +214,15 @@ export default async function EvsCoursePage() {
               EVS — Equipe que Vende Sozinha
             </div>
             <div className="ep-lessonlist">
-              {lessons.map((lesson, index) => (
-                <div className={`ep-li ${index === 0 ? 'current' : ''}`} key={lesson.id}>
+              {lessons.map((lesson: any, index) => (
+                <Link className={`ep-li ${index === currentIndex ? 'current' : ''} ${completedIds.has(lesson.dbId) ? 'done' : ''}`} href={`/area/evs?aula=${lesson.id}`} key={lesson.id}>
                   <span className="ep-dot">
                     <CheckCircle2 size={13} />
                   </span>
                   <span>
                     {index + 1}. {lesson.title}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
