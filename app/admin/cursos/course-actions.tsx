@@ -51,7 +51,7 @@ export function CursoButtons({ curso, editar, apagar }: {
     finally { setBusy(false); }
   }
   async function trocarCapa() {
-    const porArquivo = window.confirm('Clique em OK para subir uma capa JPG do computador.\n\nClique em Cancelar para continuar usando um link.');
+    const porArquivo = window.confirm('Clique em OK para subir uma capa JPG ou PNG do computador.\n\nClique em Cancelar para continuar usando um link.');
     if (porArquivo) { capaInput.current?.click(); return; }
     const cover_image_url = window.prompt('Cole o link da capa:', curso.cover_image_url || '');
     if (cover_image_url === null) return;
@@ -61,14 +61,16 @@ export function CursoButtons({ curso, editar, apagar }: {
   }
   async function subirCapa(file?: File) {
     if (!file) return;
-    if (!['image/jpeg', 'image/jpg'].includes(file.type)) { window.alert('Escolha uma imagem JPG ou JPEG.'); return; }
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) { window.alert('Escolha uma imagem JPG, JPEG ou PNG.'); return; }
     if (file.size > 5 * 1024 * 1024) { window.alert('A capa deve ter no máximo 5 MB.'); return; }
     const supabase = createClient();
     if (!supabase) { window.alert('Supabase não configurado.'); return; }
     setBusy(true);
     try {
-      const path = `${curso.id}/capa-${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from('course-covers').upload(path, file, { contentType: 'image/jpeg', upsert: false });
+      const extensao = file.type === 'image/png' ? 'png' : 'jpg';
+      const contentType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const path = `${curso.id}/capa-${Date.now()}.${extensao}`;
+      const { error } = await supabase.storage.from('course-covers').upload(path, file, { contentType, upsert: false });
       if (error) { window.alert(`Não foi possível subir a capa: ${error.message}`); return; }
       const { data } = supabase.storage.from('course-covers').getPublicUrl(path);
       const r = await editar({ ...curso, cover_image_url: data.publicUrl });
@@ -83,7 +85,7 @@ export function CursoButtons({ curso, editar, apagar }: {
     finally { setBusy(false); }
   }
   return <div className="hactions">
-    <input ref={capaInput} type="file" accept=".jpg,.jpeg,image/jpeg" hidden onChange={(e) => subirCapa(e.target.files?.[0])} />
+    <input ref={capaInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirCapa(e.target.files?.[0])} />
     <button className="btn-ghost" onClick={() => window.open(`/preview/curso?id=${curso.id}`, '_blank')} disabled={busy}><Eye size={14} /> Visualizar como aluna</button>
     <button className="btn-ghost" onClick={editarCurso} disabled={busy}><Pencil size={14} /> Editar curso</button>
     <button className="btn-ghost" onClick={trocarCapa} disabled={busy}><Image size={14} /> Capa</button>
