@@ -91,7 +91,7 @@ export async function getEvsLessons() {
 
   const { data, error } = await supabase
     .from('lessons')
-    .select('slug, title, description, duration_label, video_url, sort_order')
+    .select('id, slug, title, description, duration_label, video_url, sort_order')
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
@@ -99,6 +99,7 @@ export async function getEvsLessons() {
 
   return data.map((lesson, index) => ({
     id: lesson.slug,
+    dbId: lesson.id,
     eyebrow: index === 0 ? 'comece por aqui' : `aula ${index}`,
     title: lesson.title,
     description: lesson.description || '',
