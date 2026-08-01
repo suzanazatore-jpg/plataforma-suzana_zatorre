@@ -15,7 +15,7 @@ type EditarUsuario = (dados: {
   nome: string;
   email: string;
 }) => Promise<Resultado>;
-type ApagarUsuario = (id: string) => Promise<Resultado>;
+type ApagarUsuario = (dados: { id: string; emailConfirmacao: string }) => Promise<Resultado>;
 
 function mostrarResultado(resultado: Resultado) {
   window.alert(resultado.mensagem);
@@ -91,9 +91,14 @@ export function AcoesUsuario({
     );
     if (!confirmou) return;
 
+    const emailConfirmacao = window.prompt(
+      `Para confirmar, digite o e-mail da aluna:\n${email}`
+    )?.trim().toLowerCase();
+    if (!emailConfirmacao) return;
+
     setProcessando(true);
     try {
-      const resultado = await apagarUsuario(id);
+      const resultado = await apagarUsuario({ id, emailConfirmacao });
       mostrarResultado(resultado);
       if (resultado.ok) router.refresh();
     } finally {
