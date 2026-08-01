@@ -59,6 +59,9 @@
 .admin-shell .addlesson { padding: 11px 16px 11px 40px; border-top: 1px solid var(--line); }
 .admin-shell .addlesson button { background: transparent; border: 0; color: var(--hot); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .admin-shell .addmod { margin-top: 6px; }
+.admin-shell .extra-head { margin-top: 26px; }
+.admin-shell .extra-admin-list .lesson:first-child { border-top: 0; }
+.admin-shell .extra-empty { padding: 18px; color: var(--muted2); font-size: 12.5px; }
 
 .admin-shell .modal { background: var(--card); border: 1px solid var(--line); border-radius: 14px; max-width: 520px; margin-top: 26px; overflow: hidden; }
 .admin-shell .modal .mh { padding: 18px 20px; border-bottom: 1px solid var(--line); }
