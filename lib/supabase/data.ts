@@ -126,7 +126,7 @@ export async function getEvsMaterials() {
     title: material.title,
     description: material.description || '',
     icon: index === 0 ? ClipboardCheck : index === 1 ? CheckCircle2 : BookOpen,
-    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url) : '#'
+    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url, material.title) : '#'
   })));
 }
 
@@ -146,6 +146,6 @@ export async function getEvsLessonMaterials(lessonSlug: string) {
   return Promise.all(data.map(async (material) => ({
     title: material.title,
     description: material.description || '',
-    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url) : '#'
+    url: material.file_url ? await resolveMaterialUrl(supabase, material.file_url, material.title) : '#'
   })));
 }
