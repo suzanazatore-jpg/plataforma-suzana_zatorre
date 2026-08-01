@@ -202,7 +202,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             )}
           </div>
 
-          <CourseTabs initiallyOpen={commentsOpen} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
+          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
             <div className="ep-comment-list">
               {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>

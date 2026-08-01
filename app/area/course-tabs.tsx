@@ -1,41 +1,39 @@
-'use client';
-
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export function CourseTabs({
   information,
   comments,
-  initiallyOpen = false
+  initiallyOpen = false,
+  informationHref,
+  commentsHref
 }: {
   information: ReactNode;
   comments: ReactNode;
   initiallyOpen?: boolean;
+  informationHref: string;
+  commentsHref: string;
 }) {
-  const [commentsOpen, setCommentsOpen] = useState(initiallyOpen);
-
   return (
     <>
       <div className="ep-tabs" role="tablist" aria-label="Conteúdo da aula">
-        <button
-          className={!commentsOpen ? 'on' : ''}
-          type="button"
+        <a
+          className={!initiallyOpen ? 'on' : ''}
+          href={informationHref}
           role="tab"
-          aria-selected={!commentsOpen}
-          onClick={() => setCommentsOpen(false)}
+          aria-selected={!initiallyOpen}
         >
           Informações
-        </button>
-        <button
-          className={commentsOpen ? 'on' : ''}
-          type="button"
+        </a>
+        <a
+          className={initiallyOpen ? 'on' : ''}
+          href={commentsHref}
           role="tab"
-          aria-selected={commentsOpen}
-          onClick={() => setCommentsOpen(true)}
+          aria-selected={initiallyOpen}
         >
           Comentários
-        </button>
+        </a>
       </div>
-      <div role="tabpanel">{commentsOpen ? comments : information}</div>
+      <div role="tabpanel">{initiallyOpen ? comments : information}</div>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { BookOpen, CheckCircle2, ClipboardCheck, PlayCircle } from 'lucide-react';
 import { bonuses, lessons, platformCourses } from '@/lib/course';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 /**
  * IMPORTANTE: todas as leituras usam o cliente de servidor autenticado
@@ -85,12 +86,21 @@ export async function getPublishedCourses() {
 }
 
 export async function getEvsLessons() {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) return lessons;
+  const admin = createSupabaseAdminClient();
+  if (!admin) return lessons;
 
-  const { data, error } = await supabase
+  const { data: course } = await admin
+    .from('courses')
+    .select('id')
+    .eq('slug', 'evs')
+    .eq('is_published', true)
+    .maybeSingle();
+  if (!course) return lessons;
+
+  const { data, error } = await admin
     .from('lessons')
     .select('id, slug, title, description, duration_label, video_url, sort_order')
+    .eq('course_id', course.id)
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
@@ -110,44 +120,70 @@ export async function getEvsLessons() {
 }
 
 export async function getEvsMaterials() {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) return bonuses;
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
 
-  const { data, error } = await supabase
+  const { data: course } = await admin
+    .from('courses')
+    .select('id')
+    .eq('slug', 'evs')
+    .eq('is_published', true)
+    .maybeSingle();
+  if (!course) return [];
+
+  const { data, error } = await admin
     .from('materials')
     .select('id, title, description, file_url, sort_order')
+    .eq('course_id', course.id)
     .eq('is_published', true)
     .is('lesson_id', null)
     .order('sort_order', { ascending: true });
 
-  if (error || !data?.length) return bonuses;
+  if (error || !data?.length) return [];
 
-  return Promise.all(data.map(async (material, index) => ({
+  return data.map((material, index) => ({
     id: material.id,
     title: material.title,
     description: material.description || '',
     icon: index === 0 ? ClipboardCheck : index === 1 ? CheckCircle2 : BookOpen,
     url: `/api/materials/${material.id}/download`
-  })));
+  }));
 }
 
 export async function getEvsLessonMaterials(lessonSlug: string) {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) return [];
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
 
-  const { data, error } = await supabase
-    .from('materials')
-    .select('id, title, description, file_url, sort_order, lessons!inner(slug)')
+  const { data: course } = await admin
+    .from('courses')
+    .select('id')
+    .eq('slug', 'evs')
     .eq('is_published', true)
-    .eq('lessons.slug', lessonSlug)
+    .maybeSingle();
+  if (!course) return [];
+
+  const { data: lesson } = await admin
+    .from('lessons')
+    .select('id')
+    .eq('course_id', course.id)
+    .eq('slug', lessonSlug)
+    .eq('is_published', true)
+    .maybeSingle();
+  if (!lesson) return [];
+
+  const { data, error } = await admin
+    .from('materials')
+    .select('id, title, description, file_url, sort_order')
+    .eq('lesson_id', lesson.id)
+    .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
   if (error || !data?.length) return [];
 
-  return Promise.all(data.map(async (material) => ({
+  return data.map((material) => ({
     id: material.id,
     title: material.title,
     description: material.description || '',
     url: `/api/materials/${material.id}/download`
-  })));
+  }));
 }
