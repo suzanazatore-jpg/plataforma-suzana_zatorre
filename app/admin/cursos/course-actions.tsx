@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Image, Eye, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image, Eye, Upload, ChevronUp, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Resultado = { ok: boolean; mensagem: string; id?: string };
@@ -106,25 +106,75 @@ export function ModuloActions({ modulo, editar, apagar }: { modulo: { id: string
   return <span className="mact"><span className="iconbtn" title="Editar" onClick={edit}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></span>;
 }
 
-export function AulaActions({ courseId, moduleId, aula, salvar, apagar }: {
-  courseId: string; moduleId: string; aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; is_published: boolean };
-  salvar: (d: { id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean }) => Promise<Resultado>;
+export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover }: {
+  courseId: string; moduleId: string; aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean };
+  salvar: (d: { id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean; sortOrder?: number }) => Promise<Resultado>;
   apagar: (id: string) => Promise<Resultado>;
+  mover: (id: string, moduleId: string, direcao: 'cima' | 'baixo') => Promise<Resultado>;
 }) {
   const router = useRouter();
-  async function abrir() {
-    const title = window.prompt('Título da aula:', aula?.title || '')?.trim(); if (!title) return;
-    const slug = window.prompt('Código interno da aula:', aula?.slug || slugify(title))?.trim(); if (!slug) return;
-    const description = window.prompt('Descrição da aula:', aula?.description || '') ?? '';
-    const videoUrl = window.prompt('Link do vídeo:', aula?.video_url || '') ?? '';
-    const thumbnailUrl = window.prompt('Link da thumbnail:', aula?.thumbnail_url || '') ?? '';
-    const duration = window.prompt('Duração (ex.: 15 min):', aula?.duration_label || '') ?? '';
-    const publicada = window.confirm('Deixar esta aula publicada?');
-    const r = await salvar({ id: aula?.id, courseId, moduleId, title, slug, description, videoUrl, thumbnailUrl, duration, publicada }); window.alert(r.mensagem); if (r.ok) router.refresh();
+  const thumbInput = useRef<HTMLInputElement>(null);
+  const pendente = useRef<{ id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean; sortOrder?: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function concluir(dados: NonNullable<typeof pendente.current>) {
+    setBusy(true);
+    try { const r = await salvar(dados); window.alert(r.mensagem); if (r.ok) router.refresh(); }
+    finally { setBusy(false); }
   }
+
+  async function abrir() {
+    const valores = [
+      aula?.title || '',
+      aula?.slug || '',
+      aula?.description || '',
+      aula?.video_url || '',
+      aula?.duration_label || ''
+    ];
+    const rotulos = ['Título da aula:', 'Código interno da aula:', 'Descrição da aula:', 'Link do vídeo:', 'Duração (ex.: 15 min):'];
+    let passo = 0;
+    while (passo < rotulos.length) {
+      if (passo === 1 && !valores[1]) valores[1] = slugify(valores[0]);
+      const resposta = window.prompt(`${rotulos[passo]}\n\nDigite < para voltar ao campo anterior.`, valores[passo]);
+      if (resposta === null) return;
+      if (resposta.trim() === '<') { passo = Math.max(0, passo - 1); continue; }
+      valores[passo] = resposta.trim();
+      passo += 1;
+    }
+    if (!valores[0] || !valores[1]) { window.alert('Título e código interno são obrigatórios.'); return; }
+    const publicada = window.confirm('Deixar esta aula publicada?');
+    const dados = { id: aula?.id, courseId, moduleId, title: valores[0], slug: valores[1], description: valores[2], videoUrl: valores[3], thumbnailUrl: aula?.thumbnail_url || '', duration: valores[4], publicada, sortOrder: aula?.sort_order };
+    const porArquivo = window.confirm('Clique em OK para subir uma thumbnail JPG ou PNG do computador.\n\nClique em Cancelar para continuar usando um link.');
+    if (porArquivo) { pendente.current = dados; thumbInput.current?.click(); return; }
+    const thumbnailUrl = window.prompt('Link da thumbnail:', aula?.thumbnail_url || '');
+    if (thumbnailUrl === null) return;
+    await concluir({ ...dados, thumbnailUrl: thumbnailUrl.trim() });
+  }
+
+  async function subirThumbnail(file?: File) {
+    const dados = pendente.current;
+    if (!file || !dados) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) { window.alert('Escolha uma thumbnail JPG, JPEG ou PNG.'); return; }
+    if (file.size > 5 * 1024 * 1024) { window.alert('A thumbnail deve ter no máximo 5 MB.'); return; }
+    const supabase = createClient(); if (!supabase) { window.alert('Supabase não configurado.'); return; }
+    setBusy(true);
+    try {
+      const extensao = file.type === 'image/png' ? 'png' : 'jpg';
+      const contentType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const path = `${courseId}/thumbnails/${moduleId}-${Date.now()}.${extensao}`;
+      const { error } = await supabase.storage.from('course-covers').upload(path, file, { contentType, upsert: false });
+      if (error) { window.alert(`Não foi possível subir a thumbnail: ${error.message}`); return; }
+      const { data } = supabase.storage.from('course-covers').getPublicUrl(path);
+      const r = await salvar({ ...dados, thumbnailUrl: data.publicUrl });
+      window.alert(r.mensagem); if (r.ok) router.refresh();
+    } finally { setBusy(false); pendente.current = null; if (thumbInput.current) thumbInput.current.value = ''; }
+  }
+
   async function del() { if (!aula || !window.confirm(`Apagar a aula ${aula.title}?`)) return; const r = await apagar(aula.id); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-  if (!aula) return <button onClick={abrir}><Plus size={14} /> Adicionar aula neste módulo</button>;
-  return <><span className="iconbtn" title="Editar" onClick={abrir}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></>;
+  async function move(direcao: 'cima' | 'baixo') { if (!aula || busy) return; setBusy(true); try { const r = await mover(aula.id, moduleId, direcao); if (!r.ok) window.alert(r.mensagem); if (r.ok) router.refresh(); } finally { setBusy(false); } }
+
+  if (!aula) return <><input ref={thumbInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirThumbnail(e.target.files?.[0])} /><button onClick={abrir} disabled={busy}><Plus size={14} /> {busy ? 'Salvando...' : 'Adicionar aula neste módulo'}</button></>;
+  return <><input ref={thumbInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirThumbnail(e.target.files?.[0])} /><span className="iconbtn" title="Subir posição" onClick={() => move('cima')}><ChevronUp size={14} /></span><span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span><span className="iconbtn" title="Editar" onClick={abrir}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></>;
 }
 
 export function MaterialButton({ courseId, lessonId, salvar }: { courseId: string; lessonId: string; salvar: (d: { courseId: string; lessonId: string; title: string; fileUrl: string }) => Promise<Resultado> }) {
