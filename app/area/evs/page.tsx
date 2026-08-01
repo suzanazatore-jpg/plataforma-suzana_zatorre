@@ -149,22 +149,13 @@ export default async function EvsCoursePage() {
             </div>
           </div>
 
-          <div className="ep-notes">
-            <div className="ep-notes-head">Anotações</div>
-            <textarea placeholder="Escreva suas anotações aqui" />
-            <div className="ep-notes-foot">
-              <span />
-              <button type="button">Salvar</button>
-            </div>
-          </div>
-
           {bonuses.length ? (
             <div className="ep-side-card ep-materials-panel">
               <div className="ep-side-head">
                 <span className="ep-chk">
                   <Download size={16} />
                 </span>
-                Materiais do EVS
+                Material Extra
               </div>
               <div className="ep-mlist ep-mlist-panel">
                 {bonuses.map((bonus) => (
@@ -176,6 +167,15 @@ export default async function EvsCoursePage() {
               </div>
             </div>
           ) : null}
+
+          <div className="ep-notes">
+            <div className="ep-notes-head">Anotações</div>
+            <textarea placeholder="Escreva suas anotações aqui" />
+            <div className="ep-notes-foot">
+              <span />
+              <button type="button">Salvar</button>
+            </div>
+          </div>
         </aside>
       </div>
 
