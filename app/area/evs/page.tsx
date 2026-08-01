@@ -17,6 +17,7 @@ import {
 import { supportUrl } from '@/lib/course';
 import { getEvsLessonMaterials, getEvsLessons, getEvsMaterials } from '@/lib/supabase/data';
 import { getCurrentStudent, hasActiveEnrollment } from '@/lib/supabase/session';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { logoutStudent } from '@/app/actions/auth';
 import './evs.css';
 
@@ -25,6 +26,25 @@ export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
+
+async function addLessonComment(formData: FormData) {
+  'use server';
+  const lessonId = String(formData.get('lessonId') || '');
+  const body = String(formData.get('body') || '').trim();
+  if (!UUID.test(lessonId) || !body || body.length > 1000) return;
+
+  const supabase = (await import('@/lib/supabase/server')).createSupabaseServerClient();
+  if (!supabase) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+
+  await supabase.from('lesson_comments').insert({
+    lesson_id: lessonId,
+    profile_id: auth.user.id,
+    body
+  });
+  revalidatePath('/area/evs');
+}
 
 async function toggleLessonProgress(formData: FormData) {
   'use server';
@@ -70,7 +90,7 @@ async function toggleLessonProgress(formData: FormData) {
   revalidatePath('/area/evs');
 }
 
-export default async function EvsCoursePage({ searchParams }: { searchParams?: { aula?: string } }) {
+export default async function EvsCoursePage({ searchParams }: { searchParams?: { aula?: string; tab?: string } }) {
   const student = await getCurrentStudent();
   if (!student) {
     redirect('/?erro=login');
@@ -101,6 +121,21 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null;
   const currentCompleted = currentLesson.dbId ? completedIds.has(currentLesson.dbId) : false;
   const lessonMaterials = await getEvsLessonMaterials(currentLesson.id);
+  const admin = createSupabaseAdminClient();
+  const { data: commentRows } = admin && currentLesson.dbId
+    ? await admin.from('lesson_comments').select('id,body,created_at,profile_id').eq('lesson_id', currentLesson.dbId).order('created_at', { ascending: true })
+    : { data: [] as any[] };
+  const commenterIds = Array.from(new Set((commentRows || []).map((comment: any) => comment.profile_id)));
+  const { data: commenterProfiles } = admin && commenterIds.length
+    ? await admin.from('profiles').select('id,name').in('id', commenterIds)
+    : { data: [] as any[] };
+  const commenterNames = new Map((commenterProfiles || []).map((profile: any) => [profile.id, profile.name || 'Aluna']));
+  const comments = (commentRows || []).map((comment: any) => ({
+    ...comment,
+    author: commenterNames.get(comment.profile_id) || 'Aluna'
+  }));
+  const commentsOpen = searchParams?.tab === 'comentarios';
+  const lessonHref = `/area/evs?aula=${currentLesson.id}`;
   const initial = student.displayName.charAt(0).toUpperCase();
   const hasRealVideo = Boolean(currentLesson.videoUrl && currentLesson.videoUrl !== '#');
 
@@ -166,10 +201,23 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
           </div>
 
           <div className="ep-tabs">
-            <span className="on">Informações</span>
-            <span>Comentários</span>
+            <Link className={!commentsOpen ? 'on' : ''} href={lessonHref}>Informações</Link>
+            <Link className={commentsOpen ? 'on' : ''} href={`${lessonHref}&tab=comentarios`}>Comentários</Link>
           </div>
-          <p className="ep-desc">{currentLesson.description}</p>
+          {commentsOpen ? <section className="ep-comments">
+            <div className="ep-comment-list">
+              {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
+                <strong>{comment.author}</strong>
+                <time>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
+                <p>{comment.body}</p>
+              </article>) : <p className="ep-empty-note">Ainda não há comentários nesta aula. Seja a primeira a comentar.</p>}
+            </div>
+            {currentLesson.dbId ? <form action={addLessonComment} className="ep-comment-form">
+              <input type="hidden" name="lessonId" value={currentLesson.dbId} />
+              <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
+              <button type="submit">Publicar comentário</button>
+            </form> : null}
+          </section> : <p className="ep-desc">{currentLesson.description}</p>}
 
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/evs?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>
@@ -193,7 +241,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             {lessonMaterials.length ? (
               <div className="ep-mlist">
                 {lessonMaterials.map((material) => (
-                  <a href={material.url} key={material.title}>
+                  <a href={material.url} key={material.title} download>
                     <Download size={16} />
                     <span>{material.title}</span>
                   </a>
@@ -237,7 +285,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
               </div>
               <div className="ep-mlist ep-mlist-panel">
                 {bonuses.map((bonus) => (
-                  <a href={bonus.url} key={bonus.title}>
+                  <a href={bonus.url} key={bonus.title} download>
                     <Download size={16} />
                     <span>{bonus.title}</span>
                   </a>
