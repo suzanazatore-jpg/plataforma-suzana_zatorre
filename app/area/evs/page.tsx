@@ -81,7 +81,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
     redirect('/acesso-negado');
   }
 
-  const lessons = await getEvsLessons();
+  const lessons: any[] = await getEvsLessons();
   const bonuses = await getEvsMaterials();
   const supabase = (await import('@/lib/supabase/server')).createSupabaseServerClient();
   const lessonIds = lessons.map((lesson: any) => lesson.dbId).filter(Boolean);
