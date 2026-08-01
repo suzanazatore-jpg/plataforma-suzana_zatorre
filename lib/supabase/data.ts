@@ -12,6 +12,7 @@ import { resolveMaterialUrl } from '@/lib/supabase/material-url';
  */
 
 function mapCourse(course: {
+  id: string;
   slug: string;
   title: string;
   subtitle: string | null;
@@ -19,6 +20,7 @@ function mapCourse(course: {
 }) {
   return {
     id: course.slug,
+    dbId: course.id,
     eyebrow: course.subtitle || 'curso',
     title: course.title,
     description: course.description || '',
@@ -53,7 +55,7 @@ export async function getEnrolledCourses() {
 
   const { data, error } = await supabase
     .from('courses')
-    .select('slug, title, subtitle, description, sort_order')
+    .select('id, slug, title, subtitle, description, sort_order')
     .in('id', courseIds)
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
@@ -72,7 +74,7 @@ export async function getPublishedCourses() {
 
   const { data, error } = await supabase
     .from('courses')
-    .select('slug, title, subtitle, description, sort_order')
+    .select('id, slug, title, subtitle, description, sort_order')
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
@@ -87,8 +89,7 @@ export async function getEvsLessons() {
 
   const { data, error } = await supabase
     .from('lessons')
-    .select('id, slug, title, description, duration_label, video_url, sort_order, courses!inner(slug)')
-    .eq('courses.slug', 'evs')
+    .select('slug, title, description, duration_label, video_url, sort_order')
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
 
@@ -96,7 +97,6 @@ export async function getEvsLessons() {
 
   return data.map((lesson, index) => ({
     id: lesson.slug,
-    dbId: lesson.id,
     eyebrow: index === 0 ? 'comece por aqui' : `aula ${index}`,
     title: lesson.title,
     description: lesson.description || '',
