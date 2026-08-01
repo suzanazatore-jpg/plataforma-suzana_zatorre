@@ -303,6 +303,24 @@
   z-index: 1;
 }
 
+.member-home .mh-card .mh-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.member-home .mh-card .mh-cover + .mh-card-copy {
+  display: none;
+}
+
+.member-home .mh-card-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
 .member-home .mh-card .eyebrow {
   font-size: 12px;
   font-weight: 900;
