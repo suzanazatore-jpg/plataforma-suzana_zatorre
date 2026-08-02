@@ -98,9 +98,12 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
     redirect('/?erro=login');
   }
 
-  const enrolled = await hasActiveEnrollment('evs');
-  if (!enrolled) {
-    redirect('/acesso-negado');
+  const isAdmin = student.profile?.role === 'admin' && student.profile.status === 'active';
+  if (!isAdmin) {
+    const enrolled = await hasActiveEnrollment('evs');
+    if (!enrolled) {
+      redirect('/acesso-negado');
+    }
   }
 
   const lessons: any[] = await getEvsLessons();
@@ -124,8 +127,11 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
   const currentCompleted = currentLesson.dbId ? completedIds.has(currentLesson.dbId) : false;
   const lessonMaterials = await getEvsLessonMaterials(currentLesson.id);
   const admin = createSupabaseAdminClient();
+  const { data: courseSettings } = admin
+    ? await admin.from('courses').select('comments_enabled').eq('slug', 'evs').maybeSingle()
+    : { data: null };
   const { data: commentRows } = admin && currentLesson.dbId
-    ? await admin.from('lesson_comments').select('id,body,created_at,profile_id').eq('lesson_id', currentLesson.dbId).order('created_at', { ascending: true })
+    ? await admin.from('lesson_comments').select('id,body,created_at,profile_id,parent_id,is_admin_reply').eq('lesson_id', currentLesson.dbId).order('created_at', { ascending: true })
     : { data: [] as any[] };
   const commenterIds = Array.from(new Set((commentRows || []).map((comment: any) => comment.profile_id)));
   const { data: commenterProfiles } = admin && commenterIds.length
@@ -136,6 +142,13 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
     ...comment,
     author: commenterNames.get(comment.profile_id) || 'Aluna'
   }));
+  const rootComments = comments.filter((comment: any) => !comment.parent_id);
+  const repliesByParent = new Map<string, any[]>();
+  comments.filter((comment: any) => comment.parent_id).forEach((reply: any) => {
+    const replies = repliesByParent.get(reply.parent_id) || [];
+    replies.push(reply);
+    repliesByParent.set(reply.parent_id, replies);
+  });
   const commentsOpen = searchParams?.tab === 'comentarios';
   const lessonHref = `/area/evs?aula=${currentLesson.id}`;
   const initial = student.displayName.charAt(0).toUpperCase();
@@ -202,20 +215,31 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             )}
           </div>
 
-          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
+          <CourseTabs
+            initiallyOpen={commentsOpen}
+            informationHref={lessonHref}
+            commentsHref={`${lessonHref}&tab=comentarios`}
+            information={<p className="ep-desc">{currentLesson.description}</p>}
+            comments={<section className="ep-comments">
             <div className="ep-comment-list">
-              {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
+              {rootComments.length ? rootComments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>
                 <time>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
                 <p>{comment.body}</p>
+                {(repliesByParent.get(comment.id) || []).map((reply: any) => <div className="ep-admin-reply" key={reply.id}>
+                  <strong>Resposta da Suzana</strong>
+                  <time>{new Date(reply.created_at).toLocaleDateString('pt-BR')}</time>
+                  <p>{reply.body}</p>
+                </div>)}
               </article>) : <p className="ep-empty-note">Ainda não há comentários nesta aula. Seja a primeira a comentar.</p>}
             </div>
-            {currentLesson.dbId ? <form action={addLessonComment} className="ep-comment-form">
+            {currentLesson.dbId && courseSettings?.comments_enabled !== false ? <form action={addLessonComment} className="ep-comment-form">
               <input type="hidden" name="lessonId" value={currentLesson.dbId} />
               <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
               <button type="submit">Publicar comentário</button>
-            </form> : null}
-          </section>} />
+            </form> : <p className="ep-comments-disabled">Os comentários estão desativados neste curso.</p>}
+          </section>}
+          />
 
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/evs?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>

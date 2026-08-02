@@ -109,11 +109,7 @@ export default async function MemberAreaPage() {
                 <a
                   className="mh-card"
                   key={course.id}
-                  href={
-                    isAdmin && 'dbId' in course
-                      ? `/preview/curso?id=${course.dbId}`
-                      : course.href
-                  }
+                  href={course.href}
                 >
                   <span className="play">
                     <PlayCircle size={18} />

@@ -102,6 +102,108 @@ create table if not exists public.webhook_events (
   created_at timestamptz not null default now()
 );
 
+-- Moderacao e respostas dos comentarios das aulas.
+alter table public.enrollments
+add column if not exists expires_at timestamptz;
+
+create table if not exists public.lesson_comments (
+  id uuid primary key default gen_random_uuid(),
+  lesson_id uuid not null references public.lessons(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+
+alter table public.courses
+add column if not exists comments_enabled boolean not null default true;
+
+alter table public.lesson_comments
+add column if not exists parent_id uuid references public.lesson_comments(id) on delete cascade;
+
+alter table public.lesson_comments
+add column if not exists is_admin_reply boolean not null default false;
+
+create index if not exists lesson_comments_lesson_created_idx
+on public.lesson_comments (lesson_id, created_at);
+
+create index if not exists lesson_comments_profile_idx
+on public.lesson_comments (profile_id);
+
+create index if not exists lesson_comments_parent_idx
+on public.lesson_comments (parent_id)
+where parent_id is not null;
+
+alter table public.lesson_comments enable row level security;
+
+drop policy if exists "Enrolled students can read lesson comments" on public.lesson_comments;
+create policy "Enrolled students can read lesson comments"
+on public.lesson_comments for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.lessons l
+    join public.enrollments e on e.course_id = l.course_id
+    where l.id = lesson_comments.lesson_id
+      and e.profile_id = (select auth.uid())
+      and e.status = 'active'
+      and (e.expires_at is null or e.expires_at > now())
+  )
+  or exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid())
+      and p.role = 'admin'
+      and p.status = 'active'
+  )
+);
+
+drop policy if exists "Enrolled students can add lesson comments" on public.lesson_comments;
+create policy "Enrolled students can add lesson comments"
+on public.lesson_comments for insert
+to authenticated
+with check (
+  profile_id = (select auth.uid())
+  and parent_id is null
+  and is_admin_reply = false
+  and (
+    exists (
+      select 1
+      from public.lessons l
+      join public.enrollments e on e.course_id = l.course_id
+      join public.courses c on c.id = l.course_id
+      where l.id = lesson_comments.lesson_id
+        and e.profile_id = (select auth.uid())
+        and e.status = 'active'
+        and (e.expires_at is null or e.expires_at > now())
+        and c.comments_enabled = true
+    )
+    or exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid())
+        and p.role = 'admin'
+        and p.status = 'active'
+    )
+  )
+);
+
+drop policy if exists "Authors and admins can delete lesson comments" on public.lesson_comments;
+create policy "Authors and admins can delete lesson comments"
+on public.lesson_comments for delete
+to authenticated
+using (
+  profile_id = (select auth.uid())
+  or exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid())
+      and p.role = 'admin'
+      and p.status = 'active'
+  )
+);
+
+revoke all on table public.lesson_comments from anon;
+grant select, insert, delete on table public.lesson_comments to authenticated;
+grant select, insert, update, delete on table public.lesson_comments to service_role;
+
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
