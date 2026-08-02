@@ -5,7 +5,6 @@ import { ArrowLeft, CheckCircle2, Download, Play } from 'lucide-react';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getCurrentStudent } from '@/lib/supabase/session';
-import { logoutStudent } from '@/app/actions/auth';
 import { CourseTabs } from '@/app/area/course-tabs';
 import { MaterialDownload } from '@/app/area/material-download';
 import '@/app/area/evs/evs.css';
@@ -255,7 +254,6 @@ export default async function CoursePage({
         </aside>
       </div>
 
-      <div className="ep-supportbar"><form action={logoutStudent}><button type="submit">Sair</button></form></div>
     </div>
   );
 }
