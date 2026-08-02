@@ -16,7 +16,6 @@ import {
 import { getEvsLessonMaterials, getEvsLessons, getEvsMaterials } from '@/lib/supabase/data';
 import { getCurrentStudent, hasActiveEnrollment } from '@/lib/supabase/session';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { logoutStudent } from '@/app/actions/auth';
 import { CourseTabs } from '@/app/area/course-tabs';
 import { MaterialDownload } from '@/app/area/material-download';
 import './evs.css';
@@ -319,11 +318,6 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
         </aside>
       </div>
 
-      <div className="ep-supportbar">
-        <form action={logoutStudent}>
-          <button type="submit">Sair</button>
-        </form>
-      </div>
     </div>
   );
 }
