@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { ArrowLeft, CheckCircle2, Download, Headphones, Play } from 'lucide-react';
-import { supportUrl } from '@/lib/course';
+import { ArrowLeft, CheckCircle2, Download, Play } from 'lucide-react';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getCurrentStudent } from '@/lib/supabase/session';
@@ -63,7 +62,15 @@ async function toggleLessonProgress(formData: FormData) {
     .eq('course_id', lesson.course_id)
     .eq('status', 'active')
     .maybeSingle();
-  if (!enrollment) return;
+  if (!enrollment) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role,status')
+      .eq('id', auth.user.id)
+      .maybeSingle();
+    const isActiveAdmin = profile?.role === 'admin' && profile.status === 'active';
+    if (!isActiveAdmin) return;
+  }
 
   const { data: existing } = await supabase
     .from('lesson_progress')
@@ -230,11 +237,11 @@ export default async function CoursePage({
           </section>} />
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/${course.slug}?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>Aula anterior</Link>
-            {!isAdmin ? <form action={toggleLessonProgress}>
+            <form action={toggleLessonProgress}>
               <input type="hidden" name="lessonId" value={current.id} />
               <input type="hidden" name="courseSlug" value={course.slug} />
               <button className={`ep-complete-button ${completedIds.has(current.id) ? 'completed' : ''}`} type="submit">{completedIds.has(current.id) ? 'Aula concluída' : 'Marcar como concluída'}</button>
-            </form> : <button className="ep-complete-button" type="button">Visualização da administradora</button>}
+            </form>
             <Link className={`ep-nav-button ${!nextLesson ? 'disabled' : ''}`} href={nextLesson ? `/area/${course.slug}?aula=${nextLesson.id}` : '#'} aria-disabled={!nextLesson}>Próxima aula</Link>
           </div>
           <div className="ep-materials"><h3>Materiais desta aula</h3>{lessonMaterials.length ? <div className="ep-mlist">{lessonMaterials.map((material: any) => <MaterialDownload href={material.url} title={material.title} key={material.id} />)}</div> : <p className="ep-empty-note">Nenhum material de apoio cadastrado para esta aula.</p>}</div>
@@ -248,7 +255,7 @@ export default async function CoursePage({
         </aside>
       </div>
 
-      <div className="ep-supportbar"><a href={supportUrl} target="_blank" rel="noopener noreferrer"><Headphones size={15} /> Dúvidas sobre esta aula? Fale com o suporte</a><form action={logoutStudent}><button type="submit">Sair</button></form></div>
+      <div className="ep-supportbar"><form action={logoutStudent}><button type="submit">Sair</button></form></div>
     </div>
   );
 }
