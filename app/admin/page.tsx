@@ -99,7 +99,7 @@ export default function AdminPage() {
           <h2>Marketing e Comunicação</h2>
           <p>Ações que comunicam e engajam seus alunos.</p>
           <div className="grid">
-            <Link className="acard" href="#">
+            <Link className="acard" href="/admin/comentarios">
               <span className="ic"><MessageSquare size={24} /></span>
               <div>
                 <h3>Comentários</h3>

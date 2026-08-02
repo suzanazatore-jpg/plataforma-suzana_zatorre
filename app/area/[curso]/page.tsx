@@ -98,7 +98,7 @@ export default async function CoursePage({
 
   const { data: course } = await admin
     .from('courses')
-    .select('id, slug, title, description, subtitle')
+    .select('id, slug, title, description, subtitle, comments_enabled')
     .eq('slug', params.curso)
     .eq('is_published', true)
     .maybeSingle();
@@ -171,7 +171,7 @@ export default async function CoursePage({
   }));
   const { data: commentRows } = await admin
     .from('lesson_comments')
-    .select('id,body,created_at,profile_id')
+    .select('id,body,created_at,profile_id,parent_id,is_admin_reply')
     .eq('lesson_id', current.id)
     .order('created_at', { ascending: true });
   const commenterIds = Array.from(new Set((commentRows || []).map((comment: any) => comment.profile_id)));
@@ -183,6 +183,13 @@ export default async function CoursePage({
     ...comment,
     author: commenterNames.get(comment.profile_id) || 'Aluna'
   }));
+  const rootComments = comments.filter((comment: any) => !comment.parent_id);
+  const repliesByParent = new Map<string, any[]>();
+  comments.filter((comment: any) => comment.parent_id).forEach((reply: any) => {
+    const replies = repliesByParent.get(reply.parent_id) || [];
+    replies.push(reply);
+    repliesByParent.set(reply.parent_id, replies);
+  });
   const commentsOpen = searchParams?.tab === 'comentarios';
   const lessonHref = `/area/${course.slug}?aula=${current.id}`;
   const initial = student.displayName.charAt(0).toUpperCase();
@@ -203,18 +210,23 @@ export default async function CoursePage({
           </div>
           <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<p className="ep-desc">{current.description || course.description || course.subtitle || 'Curso sem descrição.'}</p>} comments={<section className="ep-comments">
             <div className="ep-comment-list">
-              {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
+              {rootComments.length ? rootComments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>
                 <time>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
                 <p>{comment.body}</p>
+                {(repliesByParent.get(comment.id) || []).map((reply: any) => <div className="ep-admin-reply" key={reply.id}>
+                  <strong>Resposta da Suzana</strong>
+                  <time>{new Date(reply.created_at).toLocaleDateString('pt-BR')}</time>
+                  <p>{reply.body}</p>
+                </div>)}
               </article>) : <p className="ep-empty-note">Ainda não há comentários nesta aula. Seja a primeira a comentar.</p>}
             </div>
-            <form action={addLessonComment} className="ep-comment-form">
+            {course.comments_enabled ? <form action={addLessonComment} className="ep-comment-form">
               <input type="hidden" name="lessonId" value={current.id} />
               <input type="hidden" name="courseSlug" value={course.slug} />
               <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
               <button type="submit">Publicar comentário</button>
-            </form>
+            </form> : <p className="ep-comments-disabled">Os comentários estão desativados neste curso.</p>}
           </section>} />
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/${course.slug}?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>Aula anterior</Link>

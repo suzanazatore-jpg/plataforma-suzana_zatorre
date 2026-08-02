@@ -627,6 +627,23 @@
   line-height: 1.5;
   white-space: pre-wrap;
 }
+.ep-admin-reply {
+  margin: 12px 0 2px 22px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 46, 99, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 46, 99, 0.08);
+}
+.ep-admin-reply strong { color: #ff6f94; }
+.ep-admin-reply p { margin-bottom: 0; }
+.ep-comments-disabled {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #332a2d;
+  border-radius: 9px;
+  color: #aaa0a2;
+  background: #120e0f;
+}
 
 .ep-comment-form {
   display: flex;
