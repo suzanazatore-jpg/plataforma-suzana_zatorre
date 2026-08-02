@@ -98,9 +98,12 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
     redirect('/?erro=login');
   }
 
-  const enrolled = await hasActiveEnrollment('evs');
-  if (!enrolled) {
-    redirect('/acesso-negado');
+  const isAdmin = student.profile?.role === 'admin' && student.profile.status === 'active';
+  if (!isAdmin) {
+    const enrolled = await hasActiveEnrollment('evs');
+    if (!enrolled) {
+      redirect('/acesso-negado');
+    }
   }
 
   const lessons: any[] = await getEvsLessons();
@@ -202,7 +205,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             )}
           </div>
 
-          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
+          <CourseTabs initiallyOpen={commentsOpen} information={<p className="ep-desc">{currentLesson.description}</p>} comments={<section className="ep-comments">
             <div className="ep-comment-list">
               {comments.length ? comments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>
