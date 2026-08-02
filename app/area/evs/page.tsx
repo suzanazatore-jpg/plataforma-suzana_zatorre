@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
-  Headphones,
   Maximize,
   Pause,
   Play,
@@ -14,7 +13,6 @@ import {
   SkipForward,
   Volume2
 } from 'lucide-react';
-import { supportUrl } from '@/lib/course';
 import { getEvsLessonMaterials, getEvsLessons, getEvsMaterials } from '@/lib/supabase/data';
 import { getCurrentStudent, hasActiveEnrollment } from '@/lib/supabase/session';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
@@ -322,9 +320,6 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
       </div>
 
       <div className="ep-supportbar">
-        <a href={supportUrl} target="_blank" rel="noopener noreferrer">
-          <Headphones size={15} /> Dúvidas sobre esta aula? Fale com o suporte
-        </a>
         <form action={logoutStudent}>
           <button type="submit">Sair</button>
         </form>
