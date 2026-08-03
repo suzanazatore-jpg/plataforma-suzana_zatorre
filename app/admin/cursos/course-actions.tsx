@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Eye, Upload, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Upload, ChevronUp, ChevronDown, Play } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Resultado = { ok: boolean; mensagem: string; id?: string };
@@ -270,19 +270,20 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
   );
 }
 
-export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover }: {
+export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, semSetas }: {
   courseId: string; moduleId: string;
   aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean };
   salvar: (d: { id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean; sortOrder?: number }) => Promise<Resultado>;
   apagar: (id: string) => Promise<Resultado>;
-  mover: (id: string, moduleId: string, direcao: 'cima' | 'baixo') => Promise<Resultado>;
+  mover?: (id: string, moduleId: string, direcao: 'cima' | 'baixo') => Promise<Resultado>;
+  semSetas?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function del() { if (!aula || !window.confirm(`Apagar a aula ${aula.title}?`)) return; const r = await apagar(aula.id); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-  async function move(direcao: 'cima' | 'baixo') { if (!aula || busy) return; setBusy(true); try { const r = await mover(aula.id, moduleId, direcao); if (!r.ok) window.alert(r.mensagem); if (r.ok) router.refresh(); } finally { setBusy(false); } }
+  async function move(direcao: 'cima' | 'baixo') { if (!aula || busy || !mover) return; setBusy(true); try { const r = await mover(aula.id, moduleId, direcao); if (!r.ok) window.alert(r.mensagem); if (r.ok) router.refresh(); } finally { setBusy(false); } }
 
   if (!aula) {
     return <>
@@ -291,8 +292,8 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover }:
     </>;
   }
   return <>
-    <span className="iconbtn" title="Subir posição" onClick={() => move('cima')}><ChevronUp size={14} /></span>
-    <span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span>
+    {!semSetas && <span className="iconbtn" title="Subir posição" onClick={() => move('cima')}><ChevronUp size={14} /></span>}
+    {!semSetas && <span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span>}
     <span className="iconbtn" title="Editar" onClick={() => setOpen(true)}><Pencil size={14} /></span>
     <span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span>
     {open && <AulaModal courseId={courseId} moduleId={moduleId} aula={aula} salvar={salvar} onClose={() => setOpen(false)} />}
@@ -662,6 +663,119 @@ function ModuloEditModal({ modulo, editar, onClose }: {
           <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LISTA DE AULAS COM ARRASTAR (substitui as setas de sobe/desce).
+   Mantém exatamente a mesma linha/visual de antes — só troca as
+   duas setas por uma alça de arrastar. Ao soltar, grava a nova
+   ordem chamando reordenar(moduleId, ids).
+   ============================================================ */
+
+const GRIP_SVG = (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="8 6 12 2 16 6" />
+    <polyline points="8 18 12 22 16 18" />
+    <line x1="12" y1="2" x2="12" y2="22" />
+  </svg>
+);
+
+export function AulasDoModulo({ courseId, moduleId, aulas: aulasIniciais, salvarAula, apagarAula, salvarMaterial, reordenar }: {
+  courseId: string;
+  moduleId: string;
+  aulas: any[];
+  salvarAula: (d: any) => Promise<Resultado>;
+  apagarAula: (id: string) => Promise<Resultado>;
+  salvarMaterial: (d: any) => Promise<Resultado>;
+  reordenar: (moduleId: string, ids: string[]) => Promise<Resultado>;
+}) {
+  const router = useRouter();
+  const [aulas, setAulas] = useState<any[]>(aulasIniciais);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cloneRef = useRef<HTMLDivElement | null>(null);
+  const grabOffset = useRef(0);
+  const dragIdRef = useRef<string | null>(null);
+  const aulasRef = useRef<any[]>(aulasIniciais);
+
+  useEffect(() => { setAulas(aulasIniciais); aulasRef.current = aulasIniciais; }, [aulasIniciais]);
+  useEffect(() => { aulasRef.current = aulas; }, [aulas]);
+
+  function linhas(): HTMLElement[] {
+    return Array.from(containerRef.current?.querySelectorAll('[data-lesson-row]') || []) as HTMLElement[];
+  }
+
+  function onDown(e: any, id: string) {
+    if (aulasRef.current.length < 2) return;
+    e.preventDefault();
+    const rowEl = linhas().find((r) => r.dataset.id === id);
+    if (!rowEl) return;
+    const rect = rowEl.getBoundingClientRect();
+    grabOffset.current = e.clientY - rect.top;
+
+    const clone = document.createElement('div');
+    clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:9999;pointer-events:none;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.6);`;
+    clone.innerHTML = rowEl.outerHTML;
+    const inner = clone.firstElementChild as HTMLElement | null;
+    if (inner) { inner.style.margin = '0'; inner.style.background = '#22222a'; inner.style.border = '1px solid #ff2e63'; inner.style.boxShadow = '0 0 0 3px rgba(255,46,99,.14)'; }
+    document.body.appendChild(clone);
+    cloneRef.current = clone;
+
+    dragIdRef.current = id;
+    setDragId(id);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  function onMove(e: PointerEvent) {
+    const clone = cloneRef.current;
+    if (!clone) return;
+    clone.style.top = (e.clientY - grabOffset.current) + 'px';
+    const rows = linhas();
+    let target = rows.length - 1;
+    for (let k = 0; k < rows.length; k++) {
+      const r = rows[k].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) { target = k; break; }
+    }
+    setAulas((prev) => {
+      const cur = prev.findIndex((a) => a.id === dragIdRef.current);
+      if (cur < 0 || target === cur) return prev;
+      const arr = prev.slice();
+      const [item] = arr.splice(cur, 1);
+      arr.splice(target, 0, item);
+      return arr;
+    });
+  }
+
+  async function onUp() {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    if (cloneRef.current) { cloneRef.current.remove(); cloneRef.current = null; }
+    const movedId = dragIdRef.current;
+    dragIdRef.current = null;
+    setDragId(null);
+    if (!movedId) return;
+    const ids = aulasRef.current.map((a) => a.id);
+    const r = await reordenar(moduleId, ids);
+    if (!r.ok) { window.alert(r.mensagem); }
+    router.refresh();
+  }
+
+  return (
+    <div ref={containerRef}>
+      {aulas.map((a) => (
+        <div className="lesson" data-lesson-row data-id={a.id} key={a.id} style={dragId === a.id ? { opacity: 0.35 } : undefined}>
+          <span className="play"><Play size={15} /></span>
+          <div className="lname"><b>{a.title}</b><small>{a.video_url ? 'Vídeo conectado' : 'Sem vídeo ainda'} · {a.materials?.length || 0} materiais</small></div>
+          <span className="ldur">{a.duration_label || '—'}</span>
+          <span className={`lstate ${a.is_published ? 'pub' : 'dr'}`}>{a.is_published ? 'Publicada' : 'Rascunho'}</span>
+          <MaterialButton courseId={courseId} lessonId={a.id} salvar={salvarMaterial} />
+          <span className="iconbtn" title="Arraste para reordenar" data-handle style={{ cursor: 'grab', touchAction: 'none' }} onPointerDown={(e) => onDown(e, a.id)}>{GRIP_SVG}</span>
+          <AulaActions courseId={courseId} moduleId={moduleId} aula={{ ...a, description: a.description || '', video_url: a.video_url || '', thumbnail_url: a.thumbnail_url || '', duration_label: a.duration_label || '', sort_order: a.sort_order || 0 }} salvar={salvarAula} apagar={apagarAula} semSetas />
+        </div>
+      ))}
     </div>
   );
 }
