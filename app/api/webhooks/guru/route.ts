@@ -197,10 +197,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 404 });
   }
 
-  // Supabase Auth hashes passwords with bcrypt, which has a hard 72-byte limit.
-  // One UUID plus a suffix is random enough for this one-time, unrevealed password
-  // and stays well below that limit.
-  const temporaryPassword = `${crypto.randomUUID()}-SZ`;
+  // A six-digit numeric password is easier to type from email or WhatsApp.
+  // Generate it with Web Crypto and keep the first digit non-zero.
+  const randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+  const temporaryPassword = String(100000 + (randomValue % 900000));
   const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
     email,
     password: temporaryPassword,
