@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Image, Eye, Upload, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Upload, ChevronUp, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Resultado = { ok: boolean; mensagem: string; id?: string };
@@ -28,34 +28,6 @@ export function CursoButtons({ curso, editar, apagar }: {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const capaInput = useRef<HTMLInputElement>(null);
-  async function trocarCapa() {
-    const porArquivo = window.confirm('Clique em OK para subir uma capa JPG ou PNG do computador.\n\nClique em Cancelar para continuar usando um link.');
-    if (porArquivo) { capaInput.current?.click(); return; }
-    const cover_image_url = window.prompt('Cole o link da capa:', curso.cover_image_url || '');
-    if (cover_image_url === null) return;
-    setBusy(true);
-    try { const r = await editar({ ...curso, cover_image_url: cover_image_url.trim() }); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-    finally { setBusy(false); }
-  }
-  async function subirCapa(file?: File) {
-    if (!file) return;
-    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) { window.alert('Escolha uma imagem JPG, JPEG ou PNG.'); return; }
-    if (file.size > 5 * 1024 * 1024) { window.alert('A capa deve ter no máximo 5 MB.'); return; }
-    const supabase = createClient();
-    if (!supabase) { window.alert('Supabase não configurado.'); return; }
-    setBusy(true);
-    try {
-      const extensao = file.type === 'image/png' ? 'png' : 'jpg';
-      const contentType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const path = `${curso.id}/capa-${Date.now()}.${extensao}`;
-      const { error } = await supabase.storage.from('course-covers').upload(path, file, { contentType, upsert: false });
-      if (error) { window.alert(`Não foi possível subir a capa: ${error.message}`); return; }
-      const { data } = supabase.storage.from('course-covers').getPublicUrl(path);
-      const r = await editar({ ...curso, cover_image_url: data.publicUrl });
-      window.alert(r.mensagem); if (r.ok) router.refresh();
-    } finally { setBusy(false); if (capaInput.current) capaInput.current.value = ''; }
-  }
   async function excluir() {
     if (!window.confirm(`Apagar o curso ${curso.title}?\n\nMódulos, aulas, materiais e acessos ligados a ele também serão apagados.`)) return;
     const confirmacao = window.prompt(`Digite APAGAR para confirmar:`) || '';
@@ -65,10 +37,8 @@ export function CursoButtons({ curso, editar, apagar }: {
   }
   return <>
     <div className="hactions">
-      <input ref={capaInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirCapa(e.target.files?.[0])} />
       <button className="btn-ghost" onClick={() => window.open(`/preview/curso?id=${curso.id}`, '_blank')} disabled={busy}><Eye size={14} /> Visualizar como aluna</button>
       <button className="btn-ghost" onClick={() => setEditOpen(true)} disabled={busy}><Pencil size={14} /> Editar curso</button>
-      <button className="btn-ghost" onClick={trocarCapa} disabled={busy}><Image size={14} /> Capa</button>
       <button className="btn-ghost" onClick={excluir} disabled={busy}><Trash2 size={14} /> Apagar</button>
     </div>
     {editOpen && <CursoEditModal curso={curso} editar={editar} onClose={() => setEditOpen(false)} />}
@@ -552,15 +522,38 @@ function CursoEditModal({ curso, editar, onClose }: {
   const [description, setDescription] = useState(curso.description || '');
   const [ordem, setOrdem] = useState(String(curso.sort_order ?? 0));
   const [publicado, setPublicado] = useState(curso.is_published);
+  const [capaFile, setCapaFile] = useState<File | null>(null);
+  const [capaPreview, setCapaPreview] = useState(curso.cover_image_url || '');
+  const capaInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   useEscClose(onClose);
+
+  function escolherCapa(file?: File) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) { window.alert('Escolha uma imagem JPG, JPEG ou PNG.'); return; }
+    if (file.size > 5 * 1024 * 1024) { window.alert('A capa deve ter no máximo 5 MB.'); return; }
+    setCapaFile(file);
+    setCapaPreview(URL.createObjectURL(file));
+  }
 
   async function enviar() {
     const nome = title.trim();
     if (!nome) { window.alert('Dê um nome para o curso.'); return; }
     setBusy(true);
     try {
-      const r = await editar({ ...curso, title: nome, subtitle: subtitle.trim(), description: description.trim(), sort_order: Number(ordem) || 0, is_published: publicado });
+      let cover = curso.cover_image_url || '';
+      if (capaFile) {
+        const supabase = createClient();
+        if (!supabase) { window.alert('Supabase não configurado.'); return; }
+        const ext = capaFile.type === 'image/png' ? 'png' : 'jpg';
+        const contentType = capaFile.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const path = `${curso.id}/capa-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from('course-covers').upload(path, capaFile, { contentType, upsert: false });
+        if (error) { window.alert(`Não foi possível subir a capa: ${error.message}`); return; }
+        const { data } = supabase.storage.from('course-covers').getPublicUrl(path);
+        cover = data.publicUrl;
+      }
+      const r = await editar({ ...curso, title: nome, subtitle: subtitle.trim(), description: description.trim(), cover_image_url: cover, sort_order: Number(ordem) || 0, is_published: publicado });
       if (!r.ok) { window.alert(r.mensagem); return; }
       onClose();
       router.refresh();
@@ -590,6 +583,14 @@ function CursoEditModal({ curso, editar, onClose }: {
           <div className="sza-f">
             <label>Descrição<span className="hint">opcional</span></label>
             <textarea className="sza-ta" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Sobre o que é este curso…" />
+          </div>
+          <div className="sza-f">
+            <label>Capa do curso<span className="hint">JPG ou PNG, até 5 MB</span></label>
+            <div className="sza-capa">
+              <div className="bx" style={{ width: 96, height: 54 }}>{capaPreview ? <img src={capaPreview} alt="" /> : '\u{1F5BC}\u{FE0F}'}</div>
+              <input ref={capaInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => escolherCapa(e.target.files?.[0])} />
+              <button className="sza-mini" type="button" onClick={() => capaInput.current?.click()}>Escolher imagem</button>
+            </div>
           </div>
           <div className="sza-row">
             <div className="sza-f">
