@@ -27,19 +27,8 @@ export function CursoButtons({ curso, editar, apagar }: {
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const capaInput = useRef<HTMLInputElement>(null);
-  async function editarCurso() {
-    const title = window.prompt('Nome do curso:', curso.title)?.trim(); if (!title) return;
-    const subtitle = window.prompt('Subtítulo:', curso.subtitle || '') ?? curso.subtitle;
-    const description = window.prompt('Descrição:', curso.description || '') ?? curso.description;
-    const slug = window.prompt('Código interno:', curso.slug)?.trim(); if (!slug) return;
-    const cover_image_url = window.prompt('Link da capa:', curso.cover_image_url || '') ?? curso.cover_image_url;
-    const ordem = window.prompt('Ordem de exibição:', String(curso.sort_order)); if (ordem === null) return;
-    const is_published = window.confirm('Deixar este curso publicado?');
-    setBusy(true);
-    try { const r = await editar({ ...curso, title, subtitle, description, slug, cover_image_url, sort_order: Number(ordem) || 0, is_published }); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-    finally { setBusy(false); }
-  }
   async function trocarCapa() {
     const porArquivo = window.confirm('Clique em OK para subir uma capa JPG ou PNG do computador.\n\nClique em Cancelar para continuar usando um link.');
     if (porArquivo) { capaInput.current?.click(); return; }
@@ -74,13 +63,16 @@ export function CursoButtons({ curso, editar, apagar }: {
     try { const r = await apagar(curso.id, confirmacao); window.alert(r.mensagem); if (r.ok) router.push('/admin/cursos'); }
     finally { setBusy(false); }
   }
-  return <div className="hactions">
-    <input ref={capaInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirCapa(e.target.files?.[0])} />
-    <button className="btn-ghost" onClick={() => window.open(`/preview/curso?id=${curso.id}`, '_blank')} disabled={busy}><Eye size={14} /> Visualizar como aluna</button>
-    <button className="btn-ghost" onClick={editarCurso} disabled={busy}><Pencil size={14} /> Editar curso</button>
-    <button className="btn-ghost" onClick={trocarCapa} disabled={busy}><Image size={14} /> Capa</button>
-    <button className="btn-ghost" onClick={excluir} disabled={busy}><Trash2 size={14} /> Apagar</button>
-  </div>;
+  return <>
+    <div className="hactions">
+      <input ref={capaInput} type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden onChange={(e) => subirCapa(e.target.files?.[0])} />
+      <button className="btn-ghost" onClick={() => window.open(`/preview/curso?id=${curso.id}`, '_blank')} disabled={busy}><Eye size={14} /> Visualizar como aluna</button>
+      <button className="btn-ghost" onClick={() => setEditOpen(true)} disabled={busy}><Pencil size={14} /> Editar curso</button>
+      <button className="btn-ghost" onClick={trocarCapa} disabled={busy}><Image size={14} /> Capa</button>
+      <button className="btn-ghost" onClick={excluir} disabled={busy}><Trash2 size={14} /> Apagar</button>
+    </div>
+    {editOpen && <CursoEditModal curso={curso} editar={editar} onClose={() => setEditOpen(false)} />}
+  </>;
 }
 
 export function NovoModuloButton({ cursoId, criar }: { cursoId: string; criar: (d: { courseId: string; title: string }) => Promise<Resultado> }) {
@@ -93,9 +85,13 @@ export function NovoModuloButton({ cursoId, criar }: { cursoId: string; criar: (
 
 export function ModuloActions({ modulo, editar, apagar }: { modulo: { id: string; title: string }; editar: (id: string, title: string) => Promise<Resultado>; apagar: (id: string) => Promise<Resultado> }) {
   const router = useRouter();
-  async function edit() { const title = window.prompt('Nome do módulo:', modulo.title)?.trim(); if (!title) return; const r = await editar(modulo.id, title); window.alert(r.mensagem); if (r.ok) router.refresh(); }
+  const [open, setOpen] = useState(false);
   async function del() { if (!window.confirm(`Apagar o módulo ${modulo.title} e todas as aulas dele?`)) return; const r = await apagar(modulo.id); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-  return <span className="mact"><span className="iconbtn" title="Editar" onClick={edit}><Pencil size={14} /></span><span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span></span>;
+  return <span className="mact">
+    <span className="iconbtn" title="Editar" onClick={() => setOpen(true)}><Pencil size={14} /></span>
+    <span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span>
+    {open && <ModuloEditModal modulo={modulo} editar={editar} onClose={() => setOpen(false)} />}
+  </span>;
 }
 
 /* ============================================================
@@ -532,6 +528,137 @@ function ModuloModal({ cursoId, criar, onClose }: { cursoId: string; criar: (d: 
         <div className="sza-foot">
           <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
           <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Criando…' : 'Criar módulo'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MODAIS de EDITAR curso e módulo (mesmo visual dos demais).
+   Continuam chamando as mesmas funções editar() — nada muda no banco.
+   O código interno (slug) e a capa não são alterados aqui: a capa
+   tem o botão próprio "Capa", e o slug é preservado como está.
+   ============================================================ */
+
+function CursoEditModal({ curso, editar, onClose }: {
+  curso: { id: string; title: string; subtitle: string; description: string; slug: string; cover_image_url: string; sort_order: number; is_published: boolean };
+  editar: (dados: { id: string; title: string; subtitle: string; description: string; slug: string; cover_image_url: string; sort_order: number; is_published: boolean }) => Promise<Resultado>;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [title, setTitle] = useState(curso.title || '');
+  const [subtitle, setSubtitle] = useState(curso.subtitle || '');
+  const [description, setDescription] = useState(curso.description || '');
+  const [ordem, setOrdem] = useState(String(curso.sort_order ?? 0));
+  const [publicado, setPublicado] = useState(curso.is_published);
+  const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
+
+  async function enviar() {
+    const nome = title.trim();
+    if (!nome) { window.alert('Dê um nome para o curso.'); return; }
+    setBusy(true);
+    try {
+      const r = await editar({ ...curso, title: nome, subtitle: subtitle.trim(), description: description.trim(), sort_order: Number(ordem) || 0, is_published: publicado });
+      if (!r.ok) { window.alert(r.mensagem); return; }
+      onClose();
+      router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <SzaStyles />
+      <div className="sza-modal" role="dialog" aria-modal="true">
+        <div className="sza-head">
+          <div>
+            <h2>Editar curso</h2>
+            <p>Atualize as informações do curso. A capa tem o botão próprio.</p>
+          </div>
+          <button className="sza-x" onClick={onClose} aria-label="Fechar">✕</button>
+        </div>
+        <div className="sza-body">
+          <div className="sza-f">
+            <label>Nome do curso<span className="sza-req">*</span></label>
+            <input className="sza-in" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Equipe que Vende Sozinha" />
+          </div>
+          <div className="sza-f">
+            <label>Subtítulo<span className="hint">opcional</span></label>
+            <input className="sza-in" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Uma frase curta que aparece abaixo do nome" />
+          </div>
+          <div className="sza-f">
+            <label>Descrição<span className="hint">opcional</span></label>
+            <textarea className="sza-ta" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Sobre o que é este curso…" />
+          </div>
+          <div className="sza-row">
+            <div className="sza-f">
+              <label>Ordem de exibição<span className="hint">menor aparece antes</span></label>
+              <input className="sza-in" inputMode="numeric" value={ordem} onChange={(e) => setOrdem(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" />
+            </div>
+            <div className="sza-f">
+              <label>Publicação</label>
+              <div className="sza-tog">
+                <div>
+                  <div className="l">Publicado</div>
+                  <div className="s">Se desligado, o curso fica oculto.</div>
+                </div>
+                <button type="button" className={`sza-sw ${publicado ? 'on' : ''}`} role="switch" aria-checked={publicado} onClick={() => setPublicado(!publicado)} aria-label="Publicado"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="sza-foot">
+          <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModuloEditModal({ modulo, editar, onClose }: {
+  modulo: { id: string; title: string };
+  editar: (id: string, title: string) => Promise<Resultado>;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [title, setTitle] = useState(modulo.title || '');
+  const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
+
+  async function enviar() {
+    const nome = title.trim();
+    if (!nome) { window.alert('Dê um nome para o módulo.'); return; }
+    setBusy(true);
+    try {
+      const r = await editar(modulo.id, nome);
+      if (!r.ok) { window.alert(r.mensagem); return; }
+      onClose();
+      router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <SzaStyles />
+      <div className="sza-modal sza-sm" role="dialog" aria-modal="true">
+        <div className="sza-head">
+          <div>
+            <h2>Editar módulo</h2>
+            <p>Altere o nome do módulo.</p>
+          </div>
+          <button className="sza-x" onClick={onClose} aria-label="Fechar">✕</button>
+        </div>
+        <div className="sza-body">
+          <div className="sza-f" style={{ marginBottom: 0 }}>
+            <label>Nome do módulo<span className="sza-req">*</span></label>
+            <input className="sza-in" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }} placeholder="Ex.: Módulo 1 — Comece por aqui" />
+          </div>
+        </div>
+        <div className="sza-foot">
+          <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button>
         </div>
       </div>
     </div>
