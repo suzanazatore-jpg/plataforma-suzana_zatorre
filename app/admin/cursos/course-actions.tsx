@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Trash2, Image, Eye, Upload, ChevronUp, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -241,7 +240,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
     } finally { setBusy(false); }
   }
 
-  return createPortal(
+  return (
     <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <SzaStyles />
       <div className="sza-modal" role="dialog" aria-modal="true">
@@ -309,8 +308,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
           <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Salvando…' : (aula ? 'Salvar' : 'Cadastrar aula')}</button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
 
@@ -395,7 +393,7 @@ function MaterialModal({ courseId, lessonId, salvar, onClose }: MaterialModalPro
     } finally { setBusy(false); }
   }
 
-  return createPortal(
+  return (
     <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <SzaStyles />
       <div className="sza-modal sza-sm" role="dialog" aria-modal="true">
@@ -442,8 +440,7 @@ function MaterialModal({ courseId, lessonId, salvar, onClose }: MaterialModalPro
           <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Enviando…' : 'Adicionar material'}</button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
 
