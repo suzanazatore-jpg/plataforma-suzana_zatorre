@@ -416,3 +416,56 @@
     display: none;
   }
 }
+
+
+/* ===== Meus Cursos no celular: fileira que desliza + setinha lateral ===== */
+.member-home .mh-scroll { position: relative; }
+.member-home .mh-more { display: none; }
+
+@media (max-width: 780px) {
+  .member-home .mh-grid {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 14px;
+    padding: 2px 46px 2px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .member-home .mh-grid::-webkit-scrollbar { display: none; }
+  .member-home .mh-card {
+    flex: 0 0 70%;
+    scroll-snap-align: start;
+  }
+  .member-home .mh-scroll::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 54px;
+    background: linear-gradient(to right, rgba(5, 4, 5, 0), var(--hg-bg) 80%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .member-home .mh-more {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 52px;
+    border-radius: 12px;
+    background: var(--hg-hot);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(255, 46, 99, 0.5);
+    z-index: 3;
+    pointer-events: none;
+  }
+}
