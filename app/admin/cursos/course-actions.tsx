@@ -13,21 +13,11 @@ function slugify(valor: string) {
 }
 
 export function NovoCursoButton({ criar }: { criar: (dados: { titulo: string; slug: string }) => Promise<Resultado> }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  async function abrir() {
-    const titulo = window.prompt('Nome do novo curso:')?.trim();
-    if (!titulo) return;
-    const slug = window.prompt('Código interno do curso:', slugify(titulo))?.trim();
-    if (!slug) return;
-    setBusy(true);
-    try {
-      const r = await criar({ titulo, slug });
-      window.alert(r.mensagem);
-      if (r.ok && r.id) router.push(`/admin/cursos/editar?id=${r.id}`);
-    } finally { setBusy(false); }
-  }
-  return <button className="btn-pink" onClick={abrir} disabled={busy}><Plus size={16} /> {busy ? 'Criando...' : 'Novo curso'}</button>;
+  const [open, setOpen] = useState(false);
+  return <>
+    <button className="btn-pink" onClick={() => setOpen(true)}><Plus size={16} /> Novo curso</button>
+    {open && <CursoModal criar={criar} onClose={() => setOpen(false)} />}
+  </>;
 }
 
 export function CursoButtons({ curso, editar, apagar }: {
@@ -94,9 +84,11 @@ export function CursoButtons({ curso, editar, apagar }: {
 }
 
 export function NovoModuloButton({ cursoId, criar }: { cursoId: string; criar: (d: { courseId: string; title: string }) => Promise<Resultado> }) {
-  const router = useRouter();
-  async function abrir() { const title = window.prompt('Nome do novo módulo:')?.trim(); if (!title) return; const r = await criar({ courseId: cursoId, title }); window.alert(r.mensagem); if (r.ok) router.refresh(); }
-  return <button className="btn-pink" onClick={abrir}><Plus size={16} /> Adicionar módulo</button>;
+  const [open, setOpen] = useState(false);
+  return <>
+    <button className="btn-pink" onClick={() => setOpen(true)}><Plus size={16} /> Adicionar módulo</button>
+    {open && <ModuloModal cursoId={cursoId} criar={criar} onClose={() => setOpen(false)} />}
+  </>;
 }
 
 export function ModuloActions({ modulo, editar, apagar }: { modulo: { id: string; title: string }; editar: (id: string, title: string) => Promise<Resultado>; apagar: (id: string) => Promise<Resultado> }) {
@@ -450,4 +442,98 @@ export function MaterialButton({ courseId, lessonId, salvar, label = 'Material' 
     <button className="btn-ghost" onClick={() => setOpen(true)}><Upload size={14} /> {label}</button>
     {open && <MaterialModal courseId={courseId} lessonId={lessonId} salvar={salvar} onClose={() => setOpen(false)} />}
   </>;
+}
+
+/* ============================================================
+   MODAIS de criar CURSO e MÓDULO (mesmo visual dos demais).
+   Continuam chamando as mesmas funções criar() — nada muda no banco.
+   ============================================================ */
+
+function CursoModal({ criar, onClose }: { criar: (dados: { titulo: string; slug: string }) => Promise<Resultado>; onClose: () => void }) {
+  const router = useRouter();
+  const [titulo, setTitulo] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
+
+  async function enviar() {
+    const nome = titulo.trim();
+    if (!nome) { window.alert('Dê um nome para o curso.'); return; }
+    setBusy(true);
+    try {
+      const slug = slugify(nome) || `curso-${Date.now()}`;
+      const r = await criar({ titulo: nome, slug });
+      if (!r.ok) { window.alert(r.mensagem); return; }
+      onClose();
+      if (r.id) router.push(`/admin/cursos/editar?id=${r.id}`); else router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <SzaStyles />
+      <div className="sza-modal sza-sm" role="dialog" aria-modal="true">
+        <div className="sza-head">
+          <div>
+            <h2>Novo curso</h2>
+            <p>Depois você poderá editar os detalhes, a capa e adicionar os módulos.</p>
+          </div>
+          <button className="sza-x" onClick={onClose} aria-label="Fechar">✕</button>
+        </div>
+        <div className="sza-body">
+          <div className="sza-f" style={{ marginBottom: 0 }}>
+            <label>Nome do curso<span className="sza-req">*</span></label>
+            <input className="sza-in" autoFocus value={titulo} onChange={(e) => setTitulo(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }} placeholder="Ex.: Equipe que Vende Sozinha" />
+          </div>
+        </div>
+        <div className="sza-foot">
+          <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Criando…' : 'Criar curso'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModuloModal({ cursoId, criar, onClose }: { cursoId: string; criar: (d: { courseId: string; title: string }) => Promise<Resultado>; onClose: () => void }) {
+  const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEscClose(onClose);
+
+  async function enviar() {
+    const nome = title.trim();
+    if (!nome) { window.alert('Dê um nome para o módulo.'); return; }
+    setBusy(true);
+    try {
+      const r = await criar({ courseId: cursoId, title: nome });
+      if (!r.ok) { window.alert(r.mensagem); return; }
+      onClose();
+      router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="sza-ov" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <SzaStyles />
+      <div className="sza-modal sza-sm" role="dialog" aria-modal="true">
+        <div className="sza-head">
+          <div>
+            <h2>Novo módulo</h2>
+            <p>Módulos ajudam a organizar as aulas do curso.</p>
+          </div>
+          <button className="sza-x" onClick={onClose} aria-label="Fechar">✕</button>
+        </div>
+        <div className="sza-body">
+          <div className="sza-f" style={{ marginBottom: 0 }}>
+            <label>Nome do módulo<span className="sza-req">*</span></label>
+            <input className="sza-in" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }} placeholder="Ex.: Módulo 1 — Comece por aqui" />
+          </div>
+        </div>
+        <div className="sza-foot">
+          <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Criando…' : 'Criar módulo'}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
