@@ -213,6 +213,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: createError.message }, { status: 500 });
   }
 
+  const isNewUser = Boolean(createdUser.user);
+
   const { data: recovery, error: recoveryError } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
@@ -283,6 +285,8 @@ export async function POST(request: Request) {
       course_slug: course.slug,
       course_name: course.title,
       academy_url: `${academyUrl()}/login`,
+      is_new_user: isNewUser,
+      temporary_password: isNewUser ? temporaryPassword : null,
       password_setup_url: recovery.properties.action_link
     }),
     cache: 'no-store'
