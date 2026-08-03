@@ -30,7 +30,7 @@
   border: 1px solid var(--hg-line);
   display: grid;
   place-items: center;
-  color: var(--hg-muted);
+  color: var(--hg-hot);
   flex: none;
   text-decoration: none;
 }
