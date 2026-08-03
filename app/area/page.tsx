@@ -102,6 +102,7 @@ export default async function MemberAreaPage() {
             <span>(I)</span> Meus Cursos
           </div>
 
+          <div className="mh-scroll">
           <div className="mh-grid">
             {courses.map((course) => {
               const Icon = course.icon;
@@ -128,6 +129,8 @@ export default async function MemberAreaPage() {
                 </a>
               );
             })}
+          </div>
+          <span className="mh-more" aria-hidden="true">›</span>
           </div>
         </section>
 
