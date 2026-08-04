@@ -85,7 +85,7 @@ export default function AdminPage() {
                 <p>Insira banners de novidades no topo da área de membros.</p>
               </div>
             </Link>
-            <Link className="acard" href="#">
+            <Link className="acard" href="/admin/carrosseis">
               <span className="ic"><GalleryHorizontal size={24} /></span>
               <div>
                 <h3>Carrosséis de Cursos</h3>
