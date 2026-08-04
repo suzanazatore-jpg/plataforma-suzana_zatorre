@@ -2,14 +2,17 @@
 
 import { ChangeEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Download, Upload, X, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, X, Filter, Mail, BookOpen, UserRound } from 'lucide-react';
 
 type Resultado = { ok: boolean; mensagem: string };
 type CriarUsuario = (dados: {
   nome: string;
   email: string;
-  senha: string;
+  telefone?: string;
+  cursoId?: string;
+  enviarBoasVindas: boolean;
 }) => Promise<Resultado>;
+type CursoOpcao = { id: string; title: string; slug: string };
 type EditarUsuario = (dados: {
   id: string;
   nome: string;
@@ -177,34 +180,111 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
   );
 }
 
-export function NovoUsuarioButton({ criarUsuario }: { criarUsuario: CriarUsuario }) {
+export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: CriarUsuario; cursos: CursoOpcao[] }) {
   const router = useRouter();
+  const [aberto, setAberto] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [cursoId, setCursoId] = useState('');
+  const [enviarBoasVindas, setEnviarBoasVindas] = useState(true);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
 
-  async function abrirCadastro() {
-    const nome = window.prompt('Nome completo da nova aluna:')?.trim();
-    if (!nome) return;
+  function fechar() {
+    if (processando) return;
+    setAberto(false);
+    setNome('');
+    setEmail('');
+    setTelefone('');
+    setCursoId('');
+    setEnviarBoasVindas(true);
+    setErro('');
+    setSucesso('');
+  }
 
-    const email = window.prompt('E-mail da nova aluna:')?.trim().toLowerCase();
-    if (!email) return;
-
-    const senha = window.prompt('Crie uma senha provisória com pelo menos 6 caracteres:');
-    if (!senha) return;
-
+  async function cadastrar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErro('');
+    setSucesso('');
+    if (!nome.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setErro('Preencha o nome completo e um e-mail válido.');
+      return;
+    }
     setProcessando(true);
     try {
-      const resultado = await criarUsuario({ nome, email, senha });
-      mostrarResultado(resultado);
-      if (resultado.ok) router.refresh();
+      const resultado = await criarUsuario({
+        nome: nome.trim(),
+        email: email.trim().toLowerCase(),
+        telefone,
+        cursoId: cursoId || undefined,
+        enviarBoasVindas
+      });
+      if (!resultado.ok) {
+        setErro(resultado.mensagem);
+        return;
+      }
+      setSucesso(resultado.mensagem);
+      router.refresh();
+    } catch {
+      setErro('Não foi possível concluir o cadastro. Tente novamente.');
     } finally {
       setProcessando(false);
     }
   }
 
   return (
-    <button className="btn-pink" onClick={abrirCadastro} disabled={processando}>
-      <Plus size={16} /> {processando ? 'Cadastrando...' : 'Cadastrar aluna'}
-    </button>
+    <>
+      <button className="btn-pink" type="button" onClick={() => setAberto(true)} disabled={processando}>
+        <Plus size={16} /> Cadastrar aluna
+      </button>
+
+      {aberto && (
+        <div className="new-user-overlay" role="dialog" aria-modal="true" aria-labelledby="new-user-title">
+          <form className="new-user-modal" onSubmit={cadastrar}>
+            <div className="new-user-head">
+              <div className="new-user-title-wrap">
+                <span className="new-user-icon"><UserRound size={22} /></span>
+                <div><h3 id="new-user-title">Cadastrar nova aluna</h3><p>Crie a conta e, se quiser, já libere um curso.</p></div>
+              </div>
+              <button className="new-user-close" type="button" onClick={fechar} aria-label="Fechar"><X size={18} /></button>
+            </div>
+
+            <div className="new-user-body">
+              <label className="new-user-field"><span>Nome completo <b>*</b></span><input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Maria da Silva" autoComplete="name" required /></label>
+              <label className="new-user-field"><span>E-mail <b>*</b></span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@email.com" autoComplete="email" required /></label>
+              <label className="new-user-field"><span>Celular / WhatsApp <small>(opcional)</small></span><input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(84) 99999-9999" inputMode="tel" autoComplete="tel" /></label>
+              <label className="new-user-field"><span>Curso a liberar <small>(opcional)</small></span><div className="new-user-select"><BookOpen size={16} /><select value={cursoId} onChange={(e) => setCursoId(e.target.value)}><option value="">Criar sem liberar curso</option>{cursos.map((curso) => <option key={curso.id} value={curso.id}>{curso.title}</option>)}</select></div><em>Você pode criar a conta sem curso e liberar o acesso depois.</em></label>
+
+              <label className="new-user-switch-row">
+                <span className="new-user-mail"><Mail size={17} /></span>
+                <span className="new-user-switch-copy"><strong>Enviar e-mail de boas-vindas com a senha</strong><small>Envia login, senha provisória de 6 dígitos e link de acesso.</small></span>
+                <input type="checkbox" checked={enviarBoasVindas} onChange={(e) => setEnviarBoasVindas(e.target.checked)} />
+                <span className="new-user-switch" aria-hidden="true" />
+              </label>
+              {!enviarBoasVindas && <div className="new-user-silent">🔕 A conta será criada em silêncio. Nenhum e-mail ou WhatsApp será enviado.</div>}
+              {erro && <div className="new-user-error">{erro}</div>}
+              {sucesso && <div className="new-user-success">{sucesso}</div>}
+            </div>
+
+            <div className="new-user-foot">
+              <button className="btn-ghost" type="button" onClick={fechar} disabled={processando}>{sucesso ? 'Fechar' : 'Cancelar'}</button>
+              {!sucesso && <button className="btn-pink" type="submit" disabled={processando}>{processando ? 'Cadastrando...' : 'Cadastrar aluna'}</button>}
+            </div>
+          </form>
+          <style>{`
+            .new-user-overlay{position:fixed;inset:0;z-index:1100;background:rgba(3,3,5,.86);display:grid;place-items:center;padding:18px;font-family:Archivo,Arial,sans-serif}
+            .new-user-modal{width:min(570px,100%);max-height:calc(100dvh - 36px);overflow:auto;background:#111113;border:1px solid #2b2b31;border-radius:18px;box-shadow:0 28px 90px rgba(0,0,0,.65);color:#fff}
+            .new-user-head,.new-user-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:19px 21px}.new-user-head{border-bottom:1px solid #25252a}.new-user-title-wrap{display:flex;align-items:center;gap:12px}.new-user-icon,.new-user-mail{display:grid;place-items:center;color:#ff2e63;background:#26151b;border-radius:10px}.new-user-icon{width:42px;height:42px}.new-user-head h3{font-size:19px;margin:0 0 3px}.new-user-head p{font-size:12px;color:#92929d;margin:0}.new-user-close{width:32px;height:32px;display:grid;place-items:center;background:#1c1c20;color:#aaa;border:1px solid #34343a;border-radius:8px;cursor:pointer}
+            .new-user-body{display:grid;gap:15px;padding:20px 21px}.new-user-field{display:grid;gap:7px}.new-user-field>span{font-size:12px;font-weight:700;color:#ddd}.new-user-field b{color:#ff2e63}.new-user-field small,.new-user-field em{color:#858590;font-size:11px;font-weight:400;font-style:normal}.new-user-field input,.new-user-field select{width:100%;box-sizing:border-box;background:#1b1b1f;color:#fff;border:1px solid #35353b;border-radius:10px;padding:12px 13px;outline:none;font:500 14px Archivo,Arial,sans-serif}.new-user-field input:focus,.new-user-field select:focus{border-color:#ff2e63;box-shadow:0 0 0 3px rgba(255,46,99,.12)}.new-user-select{position:relative}.new-user-select svg{position:absolute;left:12px;top:13px;color:#ff2e63;pointer-events:none}.new-user-select select{padding-left:38px;appearance:none}.new-user-select option{background:#18181b}
+            .new-user-switch-row{position:relative;display:flex;align-items:center;gap:11px;background:#1a1719;border:1px solid #40232c;border-radius:12px;padding:13px;cursor:pointer}.new-user-mail{width:34px;height:34px;flex:none}.new-user-switch-copy{display:grid;gap:3px;flex:1}.new-user-switch-copy strong{font-size:12px}.new-user-switch-copy small{font-size:10.5px;color:#92929d;line-height:1.4}.new-user-switch-row input{position:absolute;opacity:0}.new-user-switch{width:42px;height:23px;border-radius:20px;background:#3a3a40;position:relative;flex:none;transition:.2s}.new-user-switch:after{content:'';position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.2s}.new-user-switch-row input:checked+.new-user-switch{background:#ff2e63}.new-user-switch-row input:checked+.new-user-switch:after{transform:translateX(19px)}
+            .new-user-silent,.new-user-error,.new-user-success{padding:11px 12px;border-radius:9px;font-size:12px;line-height:1.45}.new-user-silent{background:#181d25;border:1px solid #2d486c;color:#cbdaf1}.new-user-error{background:#2b151b;border:1px solid #7f293d;color:#ff9bb2}.new-user-success{background:#14241a;border:1px solid #286c3d;color:#9de8b3}.new-user-foot{border-top:1px solid #25252a;justify-content:flex-end}.new-user-foot button:disabled{opacity:.5;cursor:not-allowed}
+            @media(max-width:620px){.new-user-overlay{padding:0;align-items:end}.new-user-modal{width:100%;max-height:94dvh;border-radius:18px 18px 0 0}.new-user-head,.new-user-foot{padding:16px}.new-user-body{padding:17px 16px}.new-user-switch-row{align-items:flex-start}.new-user-switch{margin-top:5px}.new-user-head p{max-width:230px}}
+          `}</style>
+        </div>
+      )}
+    </>
   );
 }
 

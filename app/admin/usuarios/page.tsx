@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Resultado = { ok: boolean; mensagem: string };
+type CursoOpcao = { id: string; title: string; slug: string };
 type AlunaImportada = { nome: string; email: string; telefone?: string };
 
 async function validarAdministradora() {
@@ -29,31 +30,75 @@ async function validarAdministradora() {
   return perfil?.role === 'admin' && perfil.status === 'active' ? supabase : null;
 }
 
-async function criarUsuario(dados: { nome: string; email: string; senha: string }): Promise<Resultado> {
+function academyUrl() {
+  return (process.env.ACADEMY_URL || 'https://academia.suzanazatorre.com.br').replace(/\/$/, '');
+}
+
+function primeiroNome(nome: string) {
+  return nome.trim().split(/\s+/)[0] || 'Aluna';
+}
+
+function gerarSenhaProvisoria() {
+  const randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+  return String(100000 + (randomValue % 900000));
+}
+
+async function criarUsuario(dados: {
+  nome: string;
+  email: string;
+  telefone?: string;
+  cursoId?: string;
+  enviarBoasVindas: boolean;
+}): Promise<Resultado> {
   'use server';
   const supabase = await validarAdministradora();
   if (!supabase) return { ok: false, mensagem: 'Somente uma administradora conectada pode cadastrar alunas.' };
 
   const nome = dados.nome.trim();
   const email = dados.email.trim().toLowerCase();
-  if (!nome || !/^\S+@\S+\.\S+$/.test(email) || dados.senha.length < 6) {
-    return { ok: false, mensagem: 'Confira nome, e-mail e senha. A senha precisa ter pelo menos 6 caracteres.' };
+  const telefone = String(dados.telefone || '').replace(/\D/g, '');
+  const cursoId = String(dados.cursoId || '').trim();
+  if (!nome || !/^\S+@\S+\.\S+$/.test(email)) {
+    return { ok: false, mensagem: 'Confira o nome completo e o e-mail informado.' };
   }
+
+  const { data: perfilExistente } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  if (perfilExistente) return { ok: false, mensagem: 'Já existe uma aluna cadastrada com este e-mail.' };
+
+  let curso: CursoOpcao | null = null;
+  if (cursoId) {
+    if (!UUID.test(cursoId)) return { ok: false, mensagem: 'Escolha um curso válido para liberar.' };
+    const { data: cursoEncontrado, error: cursoErro } = await supabase
+      .from('courses')
+      .select('id, title, slug')
+      .eq('id', cursoId)
+      .maybeSingle();
+    if (cursoErro || !cursoEncontrado) return { ok: false, mensagem: 'O curso escolhido não foi encontrado.' };
+    curso = cursoEncontrado;
+  }
+
+  const senhaProvisoria = dados.enviarBoasVindas ? gerarSenhaProvisoria() : null;
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
-    password: dados.senha,
+    ...(senhaProvisoria ? { password: senhaProvisoria } : {}),
     email_confirm: true,
-    user_metadata: { name: nome }
+    user_metadata: { name: nome, phone: telefone || null, source: 'admin_manual' }
   });
   if (error || !data.user) {
-    return { ok: false, mensagem: error?.message?.includes('already') ? 'Já existe uma usuária com este e-mail.' : 'Não foi possível cadastrar a aluna.' };
+    const duplicado = error?.message?.toLowerCase().includes('already');
+    return { ok: false, mensagem: duplicado ? 'Já existe uma aluna cadastrada com este e-mail.' : 'Não foi possível cadastrar a aluna. Tente novamente.' };
   }
 
   const { error: perfilErro } = await supabase.from('profiles').upsert({
     id: data.user.id,
     name: nome,
     email,
+    phone: telefone || null,
     role: 'student',
     status: 'active',
     updated_at: new Date().toISOString()
@@ -63,8 +108,70 @@ async function criarUsuario(dados: { nome: string; email: string; senha: string 
     return { ok: false, mensagem: 'O login foi criado, mas o cadastro da aluna falhou. Tente novamente.' };
   }
 
+  if (curso) {
+    const { error: matriculaErro } = await supabase.from('enrollments').upsert(
+      {
+        profile_id: data.user.id,
+        course_id: curso.id,
+        status: 'active',
+        source: 'admin_manual',
+        purchased_at: new Date().toISOString()
+      },
+      { onConflict: 'profile_id,course_id' }
+    );
+    if (matriculaErro) {
+      await supabase.from('profiles').delete().eq('id', data.user.id);
+      await supabase.auth.admin.deleteUser(data.user.id);
+      return { ok: false, mensagem: 'Não foi possível liberar o curso. A conta não foi criada; tente novamente.' };
+    }
+  }
+
+  let aviso = '';
+  if (dados.enviarBoasVindas && senhaProvisoria) {
+    const { data: recovery, error: recoveryError } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo: `${academyUrl()}/recuperar-senha` }
+    });
+    const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
+
+    if (recoveryError || !recovery?.properties?.action_link || !pabblyUrl) {
+      aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
+    } else {
+      try {
+        const idManual = `admin-${crypto.randomUUID()}`;
+        const pabblyResponse = await fetch(pabblyUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            event: 'academy_access_created',
+            transaction_id: idManual,
+            first_name: primeiroNome(nome),
+            full_name: nome,
+            email,
+            phone: telefone || null,
+            product_id: curso?.id || null,
+            product_name: curso?.title || 'Cadastro manual sem curso',
+            course_slug: curso?.slug || null,
+            course_name: curso?.title || null,
+            academy_url: `${academyUrl()}/login`,
+            is_new_user: true,
+            temporary_password: senhaProvisoria,
+            password_setup_url: recovery.properties.action_link
+          }),
+          cache: 'no-store'
+        });
+        if (!pabblyResponse.ok) aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
+      } catch {
+        aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
+      }
+    }
+  }
+
   revalidatePath('/admin/usuarios');
-  return { ok: true, mensagem: 'Aluna cadastrada com sucesso.' };
+  const acesso = curso ? ` e acesso ao curso “${curso.title}” liberado` : ' sem curso liberado';
+  const envio = dados.enviarBoasVindas && !aviso ? ' E-mail de boas-vindas enviado.' : dados.enviarBoasVindas ? '' : ' Nenhuma mensagem foi enviada.';
+  return { ok: true, mensagem: `Aluna cadastrada${acesso}.${envio}${aviso}` };
 }
 
 async function editarUsuario(dados: { id: string; nome: string; email: string }): Promise<Resultado> {
@@ -229,17 +336,20 @@ function criarIniciais(nome: string) {
 export default async function UsuariosPage() {
   const supabase = createSupabaseAdminClient();
   let alunas: any[] = [];
+  let cursos: CursoOpcao[] = [];
   let erroConexao = false;
 
   if (!supabase) erroConexao = true;
   else {
-    const [{ data: profiles, error: profilesError }, { data: enrollments, error: enrollmentsError }, { data: authData, error: authError }] = await Promise.all([
+    const [{ data: profiles, error: profilesError }, { data: enrollments, error: enrollmentsError }, { data: authData, error: authError }, { data: courses, error: coursesError }] = await Promise.all([
       supabase.from('profiles').select('id, name, email, status, created_at').order('created_at', { ascending: false }),
       supabase.from('enrollments').select('profile_id, status, expires_at'),
-      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      supabase.from('courses').select('id, title, slug').order('sort_order', { ascending: true })
     ]);
-    if (profilesError || enrollmentsError || authError) erroConexao = true;
+    if (profilesError || enrollmentsError || authError || coursesError) erroConexao = true;
     else {
+      cursos = courses || [];
       alunas = (profiles || []).map((profile) => {
         const matriculas = (enrollments || []).filter((item) => item.profile_id === profile.id);
         const usuarioAuth = authData?.users?.find((usuario) => usuario.id === profile.id);
@@ -265,7 +375,7 @@ export default async function UsuariosPage() {
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
       <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
-      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><NovoUsuarioButton criarUsuario={criarUsuario} /></div></div>
+      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
         {alunas.length === 0 ? <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center' }}>Nenhuma aluna cadastrada.</td></tr> : alunas.map((a) => <tr key={a.id}>
