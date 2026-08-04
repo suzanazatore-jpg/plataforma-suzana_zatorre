@@ -3,13 +3,14 @@ import { Users, Filter, MessageSquare } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NovoUsuarioButton, AcoesUsuario } from './user-actions';
+import { NovoUsuarioButton, AcoesUsuario, ListaUsuariosButtons } from './user-actions';
 import './usuarios.css';
 
 export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Resultado = { ok: boolean; mensagem: string };
+type AlunaImportada = { nome: string; email: string; telefone?: string };
 
 async function validarAdministradora() {
   const clienteSessao = createSupabaseServerClient();
@@ -128,6 +129,82 @@ async function apagarUsuario(dados: { id: string; emailConfirmacao: string }): P
   return { ok: true, mensagem: 'Aluna apagada com sucesso.' };
 }
 
+
+async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
+  'use server';
+  const supabase = await validarAdministradora();
+  if (!supabase) return { ok: false, mensagem: 'Somente uma administradora conectada pode importar alunas.' };
+  if (!Array.isArray(dados) || dados.length === 0) return { ok: false, mensagem: 'A planilha não contém alunas para importar.' };
+  if (dados.length > 500) return { ok: false, mensagem: 'Importe no máximo 500 alunas por vez.' };
+
+  const unicas = new Map<string, AlunaImportada>();
+  let invalidas = 0;
+  for (const item of dados) {
+    const nome = String(item.nome || '').trim();
+    const email = String(item.email || '').trim().toLowerCase();
+    const telefone = String(item.telefone || '').replace(/\D/g, '');
+    if (!nome || !/^\S+@\S+\.\S+$/.test(email)) {
+      invalidas++;
+      continue;
+    }
+    if (!unicas.has(email)) unicas.set(email, { nome, email, telefone });
+  }
+
+  let criadas = 0;
+  let duplicadas = dados.length - invalidas - unicas.size;
+  let falhas = 0;
+
+  for (const aluna of Array.from(unicas.values())) {
+    const { data: perfilExistente } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', aluna.email)
+      .maybeSingle();
+
+    if (perfilExistente) {
+      duplicadas++;
+      continue;
+    }
+
+    // Criação silenciosa: sem senha, sem e-mail, sem WhatsApp e sem matrícula automática.
+    const { data: authData, error: authErro } = await supabase.auth.admin.createUser({
+      email: aluna.email,
+      email_confirm: true,
+      user_metadata: { name: aluna.nome, phone: aluna.telefone || null, source: 'csv_import' }
+    });
+
+    if (authErro || !authData.user) {
+      if (authErro?.message?.toLowerCase().includes('already')) duplicadas++;
+      else falhas++;
+      continue;
+    }
+
+    const { error: perfilErro } = await supabase.from('profiles').upsert({
+      id: authData.user.id,
+      name: aluna.nome,
+      email: aluna.email,
+      phone: aluna.telefone || null,
+      role: 'student',
+      status: 'active',
+      updated_at: new Date().toISOString()
+    });
+
+    if (perfilErro) {
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      falhas++;
+      continue;
+    }
+    criadas++;
+  }
+
+  revalidatePath('/admin/usuarios');
+  const partes = [`${criadas} criada${criadas === 1 ? '' : 's'}`];
+  if (duplicadas) partes.push(`${duplicadas} duplicada${duplicadas === 1 ? '' : 's'} ignorada${duplicadas === 1 ? '' : 's'}`);
+  if (invalidas) partes.push(`${invalidas} linha${invalidas === 1 ? '' : 's'} inválida${invalidas === 1 ? '' : 's'}`);
+  if (falhas) partes.push(`${falhas} falha${falhas === 1 ? '' : 's'}`);
+  return { ok: falhas === 0, mensagem: `Importação concluída: ${partes.join(', ')}. Nenhum aviso ou senha foi enviado.` };
+}
+
 function formatarData(data?: string | null) {
   if (!data) return '—';
   return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza' }).format(new Date(data));
@@ -188,7 +265,7 @@ export default async function UsuariosPage() {
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
       <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
-      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><button className="btn-ghost"><Filter size={15} /> Filtrar</button><NovoUsuarioButton criarUsuario={criarUsuario} /></div></div>
+      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><button className="btn-ghost"><Filter size={15} /> Filtrar</button><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><NovoUsuarioButton criarUsuario={criarUsuario} /></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
         {alunas.length === 0 ? <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center' }}>Nenhuma aluna cadastrada.</td></tr> : alunas.map((a) => <tr key={a.id}>
