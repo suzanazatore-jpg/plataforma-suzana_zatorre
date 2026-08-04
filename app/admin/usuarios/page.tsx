@@ -3,7 +3,7 @@ import { Users, Filter, MessageSquare } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NovoUsuarioButton, AcoesUsuario, ListaUsuariosButtons } from './user-actions';
+import { AcoesUsuario, ListaUsuariosButtons } from './user-actions';
 import './usuarios.css';
 
 export const dynamic = 'force-dynamic';
@@ -265,7 +265,7 @@ export default async function UsuariosPage() {
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
       <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
-      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><button className="btn-ghost"><Filter size={15} /> Filtrar</button><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><NovoUsuarioButton criarUsuario={criarUsuario} /></div></div>
+      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><button className="btn-ghost"><Filter size={15} /> Filtrar</button></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
         {alunas.length === 0 ? <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center' }}>Nenhuma aluna cadastrada.</td></tr> : alunas.map((a) => <tr key={a.id}>
