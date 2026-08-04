@@ -19,9 +19,11 @@ export const checkoutUrl =
 export const platformCourses = [
   {
     id: 'evs',
+    dbId: '',
     eyebrow: 'curso principal',
     title: 'EVS - Equipe que Vende Sozinha',
     description: 'Implante rotina, padrao comercial e acompanhamento para vender sem depender de voce.',
+    coverImageUrl: '',
     duration: `${7} aulas + bonus`,
     icon: PlayCircle,
     accent: '#e6325a',
