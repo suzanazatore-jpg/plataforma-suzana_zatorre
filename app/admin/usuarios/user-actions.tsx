@@ -203,7 +203,7 @@ export function NovoUsuarioButton({ criarUsuario }: { criarUsuario: CriarUsuario
 
   return (
     <button className="btn-pink" onClick={abrirCadastro} disabled={processando}>
-      <Plus size={16} /> {processando ? 'Cadastrando...' : 'Novo usuário'}
+      <Plus size={16} /> {processando ? 'Cadastrando...' : 'Cadastrar aluna'}
     </button>
   );
 }
