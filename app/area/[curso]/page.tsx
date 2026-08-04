@@ -247,9 +247,24 @@ export default async function CoursePage({
         </div>
 
         <aside>
-          <div className="ep-side-card"><div className="ep-side-head"><span className="ep-chk"><CheckCircle2 size={16} /></span>{course.title}</div><div className="ep-lessonlist">
-            {lessons.map((lesson: any, index: number) => <Link className={`ep-li ${lesson.id === current.id ? 'current' : ''} ${completedIds.has(lesson.id) ? 'done' : ''}`} href={`/area/${course.slug}?aula=${lesson.id}`} key={lesson.id}><span className="ep-dot"><CheckCircle2 size={13} /></span><span>{index + 1}. {lesson.title}</span></Link>)}
-          </div></div>
+          <div className="ep-side-card">
+            <div className="ep-side-head"><span className="ep-chk"><CheckCircle2 size={16} /></span>{course.title}</div>
+            <div className="ep-module-list">
+              {(modules || []).map((module: any) => {
+                const publishedLessons = (module.lessons || []).filter((lesson: any) => lesson.is_published);
+                if (!publishedLessons.length) return null;
+                return <section className="ep-module" key={module.id}>
+                  <h3 className="ep-module-head">{module.title}</h3>
+                  <div className="ep-lessonlist">
+                    {publishedLessons.map((lesson: any) => {
+                      const lessonIndex = lessons.findIndex((item: any) => item.id === lesson.id);
+                      return <Link className={`ep-li ${lesson.id === current.id ? 'current' : ''} ${completedIds.has(lesson.id) ? 'done' : ''}`} href={`/area/${course.slug}?aula=${lesson.id}`} key={lesson.id}><span className="ep-dot"><CheckCircle2 size={13} /></span><span>{lessonIndex + 1}. {lesson.title}</span></Link>;
+                    })}
+                  </div>
+                </section>;
+              })}
+            </div>
+          </div>
           {extras.length ? <div className="ep-side-card ep-materials-panel"><div className="ep-side-head"><span className="ep-chk"><Download size={16} /></span>Material Extra</div><div className="ep-mlist ep-mlist-panel">{extras.map((material: any) => <MaterialDownload href={material.url} title={material.title} key={material.id} />)}</div></div> : null}
         </aside>
       </div>
