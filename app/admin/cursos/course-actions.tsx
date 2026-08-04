@@ -779,3 +779,29 @@ export function AulasDoModulo({ courseId, moduleId, aulas: aulasIniciais, salvar
     </div>
   );
 }
+
+/* ============================================================
+   BOTÃO DE APAGAR MATERIAL (lixeira). Pede confirmação e chama
+   a função apagarMaterial, que remove o arquivo e o registro.
+   ============================================================ */
+
+export function MaterialDeleteButton({ material, apagar }: {
+  material: { id: string; title: string; file_url?: string };
+  apagar: (id: string, fileUrl: string) => Promise<Resultado>;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function del() {
+    if (busy) return;
+    if (!window.confirm(`Apagar o material "${material.title}"?`)) return;
+    setBusy(true);
+    try {
+      const r = await apagar(material.id, material.file_url || '');
+      if (!r.ok) { window.alert(r.mensagem); return; }
+      router.refresh();
+    } finally { setBusy(false); }
+  }
+
+  return <span className="iconbtn" title="Apagar material" onClick={del}><Trash2 size={14} /></span>;
+}
