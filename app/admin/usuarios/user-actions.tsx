@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
 
 type Resultado = { ok: boolean; mensagem: string };
 type CriarUsuario = (dados: {
@@ -16,9 +16,80 @@ type EditarUsuario = (dados: {
   email: string;
 }) => Promise<Resultado>;
 type ApagarUsuario = (dados: { id: string; emailConfirmacao: string }) => Promise<Resultado>;
+type AlunaImportada = { nome: string; email: string; telefone?: string };
+type ImportarUsuarios = (dados: AlunaImportada[]) => Promise<Resultado>;
 
 function mostrarResultado(resultado: Resultado) {
   window.alert(resultado.mensagem);
+}
+
+
+function normalizarCabecalho(valor: string) {
+  return valor.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function lerCsv(conteudo: string): AlunaImportada[] {
+  const linhas = conteudo.replace(/^\uFEFF/, '').split(/\r?\n/).filter((linha) => linha.trim());
+  if (linhas.length < 2) return [];
+  const separador = (linhas[0].match(/;/g) || []).length >= (linhas[0].match(/,/g) || []).length ? ';' : ',';
+  const cabecalhos = linhas[0].split(separador).map(normalizarCabecalho);
+  const indiceNome = cabecalhos.findIndex((item) => ['nome', 'name', 'nome completo'].includes(item));
+  const indiceEmail = cabecalhos.findIndex((item) => ['email', 'e-mail'].includes(item));
+  const indiceTelefone = cabecalhos.findIndex((item) => ['telefone', 'phone', 'whatsapp', 'celular'].includes(item));
+  if (indiceNome < 0 || indiceEmail < 0) return [];
+
+  return linhas.slice(1).map((linha) => {
+    const colunas = linha.split(separador).map((item) => item.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+    return {
+      nome: colunas[indiceNome] || '',
+      email: colunas[indiceEmail] || '',
+      telefone: indiceTelefone >= 0 ? colunas[indiceTelefone] || '' : ''
+    };
+  }).filter((item) => item.nome || item.email);
+}
+
+export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: ImportarUsuarios }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [processando, setProcessando] = useState(false);
+
+  async function selecionarArquivo(event: ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = '';
+    if (!arquivo) return;
+    if (!arquivo.name.toLowerCase().endsWith('.csv')) {
+      window.alert('Escolha uma planilha no formato CSV.');
+      return;
+    }
+
+    const alunas = lerCsv(await arquivo.text());
+    if (!alunas.length) {
+      window.alert('Não encontrei as colunas Nome e Email. Baixe a lista modelo e salve como CSV.');
+      return;
+    }
+    if (!window.confirm(`Encontrei ${alunas.length} linha(s). Criar as contas sem senha, sem mensagens e sem liberar cursos?`)) return;
+
+    setProcessando(true);
+    try {
+      const resultado = await importarUsuarios(alunas);
+      mostrarResultado(resultado);
+      router.refresh();
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  return (
+    <>
+      <a className="btn-ghost" href="/api/admin/alunas-export" download>
+        <Download size={15} /> Baixar lista
+      </a>
+      <button className="btn-ghost" type="button" onClick={() => inputRef.current?.click()} disabled={processando}>
+        <Upload size={15} /> {processando ? 'Subindo...' : 'Subir lista'}
+      </button>
+      <input ref={inputRef} type="file" accept=".csv,text/csv" hidden onChange={selecionarArquivo} />
+    </>
+  );
 }
 
 export function NovoUsuarioButton({ criarUsuario }: { criarUsuario: CriarUsuario }) {
