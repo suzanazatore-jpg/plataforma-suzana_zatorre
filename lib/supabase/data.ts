@@ -85,6 +85,42 @@ export async function getPublishedCourses() {
   return data.map(mapCourse);
 }
 
+export async function getPublishedCourseShelves(courses: Awaited<ReturnType<typeof getPublishedCourses>>) {
+  const supabase = createSupabaseServerClient();
+  if (!supabase || !courses.length) return [];
+
+  const { data: shelves, error: shelvesError } = await supabase
+    .from('course_shelves')
+    .select('id, title, subtitle, sort_order')
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true });
+
+  if (shelvesError || !shelves?.length) return [];
+
+  const { data: links, error: linksError } = await supabase
+    .from('shelf_courses')
+    .select('shelf_id, course_id, sort_order')
+    .in('shelf_id', shelves.map((shelf) => shelf.id))
+    .order('sort_order', { ascending: true });
+
+  if (linksError) return [];
+
+  const coursesById = new Map(courses.map((course) => [course.dbId, course]));
+
+  return shelves
+    .map((shelf) => ({
+      id: shelf.id,
+      title: shelf.title,
+      subtitle: shelf.subtitle || '',
+      courses: (links || [])
+        .filter((link) => link.shelf_id === shelf.id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((link) => coursesById.get(link.course_id))
+        .filter((course): course is (typeof courses)[number] => Boolean(course))
+    }))
+    .filter((shelf) => shelf.courses.length > 0);
+}
+
 export async function getEvsLessons() {
   const admin = createSupabaseAdminClient();
   if (!admin) return lessons;
