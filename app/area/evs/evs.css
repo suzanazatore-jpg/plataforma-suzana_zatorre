@@ -704,3 +704,26 @@
 .ep-module .ep-lessonlist {
   padding-bottom: 8px;
 }
+
+/* ===== Cabeçalho da aula no celular: enxuto e com hierarquia ===== */
+@media (max-width: 640px) {
+  .ep-bar {
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  /* esconde o logo grande e o "Olá, nome" pra dar espaço ao nome da aula */
+  .ep-logo { display: none; }
+  .ep-who { display: none; }
+
+  .ep-title { flex: 1; min-width: 0; }
+  .ep-title small {
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .ep-title h1 {
+    margin-top: 3px;
+    font-size: 18px;
+    line-height: 1.15;
+  }
+}
+
