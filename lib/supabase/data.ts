@@ -85,7 +85,7 @@ export async function getPublishedCourses() {
   return data.map(mapCourse);
 }
 
-export async function getPublishedCourseShelves<T extends { dbId?: string }>(courses: T[]) {
+export async function getPublishedCourseShelves<T>(courses: T[]) {
   const supabase = createSupabaseServerClient();
   if (!supabase || !courses.length) return [];
 
@@ -105,7 +105,20 @@ export async function getPublishedCourseShelves<T extends { dbId?: string }>(cou
 
   if (linksError) return [];
 
-  const coursesById = new Map(courses.map((course) => [course.dbId, course]));
+  const coursesById = new Map(
+    courses.flatMap((course) => {
+      if (
+        typeof course === 'object' &&
+        course !== null &&
+        'dbId' in course &&
+        typeof course.dbId === 'string'
+      ) {
+        return [[course.dbId, course] as const];
+      }
+
+      return [];
+    })
+  );
 
   return shelves
     .map((shelf) => ({
