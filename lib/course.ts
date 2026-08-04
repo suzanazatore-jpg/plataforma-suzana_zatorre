@@ -10,8 +10,7 @@ import {
 } from 'lucide-react';
 
 export const supportUrl =
-  process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_URL ||
-  'https://api.whatsapp.com/send?phone=558499814124&text=Suh,%20tenho%20uma%20d%C3%BAvida';
+  'https://api.whatsapp.com/send?phone=558499814124&text=Sou%20aluna%20e%20quero%20ajuda';
 
 export const checkoutUrl =
   process.env.NEXT_PUBLIC_CHECKOUT_URL ||
