@@ -112,6 +112,7 @@ export default async function MemberAreaPage() {
               <div className="mh-scroll">
                 <div className="mh-grid">
                   {shelf.courses.map((course) => {
+                    if (!course) return null;
                     const Icon = course.icon;
                     return (
                       <a
