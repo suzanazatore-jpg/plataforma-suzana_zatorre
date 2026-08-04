@@ -13,6 +13,7 @@ import {
 import { supportUrl } from '@/lib/course';
 import { getEnrolledCourses, getPublishedCourses } from '@/lib/supabase/data';
 import { getCurrentStudent } from '@/lib/supabase/session';
+import { CarrosselMais } from './carrossel-mais';
 import './area-home.css';
 
 export const dynamic = 'force-dynamic';
@@ -130,7 +131,7 @@ export default async function MemberAreaPage() {
               );
             })}
           </div>
-          <span className="mh-more" aria-hidden="true">›</span>
+          <CarrosselMais />
           </div>
         </section>
 
@@ -138,6 +139,13 @@ export default async function MemberAreaPage() {
           © 2026 Suzana Zatorre. Todos os direitos reservados.
         </footer>
       </main>
+      <nav className="mh-tabbar" aria-label="Menu">
+        <Link className="active" href="/area"><Home size={20} /><span>Início</span></Link>
+        <a href="#cursos"><BookOpen size={20} /><span>Cursos</span></a>
+        <a href="#cursos"><PlayCircle size={20} /><span>Extras</span></a>
+        <a href={supportUrl} target="_blank" rel="noopener noreferrer"><Headphones size={20} /><span>Suporte</span></a>
+        {isAdmin ? (<Link href="/admin"><ShieldCheck size={20} /><span>Admin</span></Link>) : null}
+      </nav>
     </div>
   );
 }
