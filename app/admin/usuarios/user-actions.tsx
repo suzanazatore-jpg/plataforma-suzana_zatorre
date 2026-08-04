@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Download, Upload, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, X, Filter } from 'lucide-react';
 
 type Resultado = { ok: boolean; mensagem: string };
 type CriarUsuario = (dados: {
@@ -98,6 +98,7 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
         return;
       }
       window.alert(resultado.mensagem);
+      setProcessando(false);
       fechar();
       router.refresh();
     } catch {
@@ -112,6 +113,7 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
       <a className="btn-ghost" href="/api/admin/alunas-export" download>
         <Download size={15} /> Baixar
       </a>
+      <button className="btn-ghost" type="button"><Filter size={15} /> Filtrar</button>
       <button className="btn-pink" type="button" onClick={() => setAberto(true)}>
         <Plus size={15} /> Subir planilha
       </button>
