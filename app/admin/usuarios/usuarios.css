@@ -248,7 +248,7 @@
 
 
 /* Importação de alunas por planilha */
-.admin-shell .import-overlay {
+.import-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -257,7 +257,7 @@
   place-items: center;
   padding: 20px;
 }
-.admin-shell .import-modal {
+.import-modal {
   width: min(558px, 100%);
   max-height: calc(100vh - 40px);
   overflow: auto;
@@ -266,29 +266,29 @@
   border-radius: 16px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
 }
-.admin-shell .import-head,
-.admin-shell .import-foot {
+.import-head,
+.import-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   padding: 18px 20px;
 }
-.admin-shell .import-head {
+.import-head {
   border-bottom: 1px solid #232429;
 }
-.admin-shell .import-head h3 {
+.import-head h3 {
   margin: 0 0 2px;
   color: #fff;
   font-size: 18px;
 }
-.admin-shell .import-head p,
-.admin-shell .import-foot > span {
+.import-head p,
+.import-foot > span {
   margin: 0;
   color: var(--muted2);
   font-size: 12px;
 }
-.admin-shell .import-close {
+.import-close {
   width: 30px;
   height: 30px;
   border: 1px solid #303138;
@@ -299,10 +299,10 @@
   place-items: center;
   cursor: pointer;
 }
-.admin-shell .import-body {
+.import-body {
   padding: 18px 20px 14px;
 }
-.admin-shell .import-notice {
+.import-notice {
   display: flex;
   gap: 12px;
   padding: 13px 14px;
@@ -311,24 +311,24 @@
   background: #111d2c;
   color: #e8f1ff;
 }
-.admin-shell .import-notice p {
+.import-notice p {
   margin: 0;
   font-size: 12px;
   line-height: 1.55;
 }
-.admin-shell .import-help {
+.import-help {
   color: #aeb5c4;
   font-size: 12px;
   line-height: 1.55;
   margin: 14px 0 12px;
 }
-.admin-shell .import-help code {
+.import-help code {
   color: #ff4f76;
   background: #232329;
   border-radius: 4px;
   padding: 1px 5px;
 }
-.admin-shell .import-drop {
+.import-drop {
   min-height: 110px;
   border: 1px dashed #4a4c55;
   border-radius: 12px;
@@ -341,61 +341,61 @@
   cursor: pointer;
   transition: border-color .2s, background .2s;
 }
-.admin-shell .import-drop:hover {
+.import-drop:hover {
   border-color: var(--hot);
   background: #242126;
 }
-.admin-shell .import-drop svg {
+.import-drop svg {
   color: #fff;
   margin-bottom: 7px;
 }
-.admin-shell .import-drop strong {
+.import-drop strong {
   font-size: 13px;
 }
-.admin-shell .import-drop span {
+.import-drop span {
   margin-top: 3px;
   color: var(--muted2);
   font-size: 11px;
 }
-.admin-shell .import-error,
-.admin-shell .import-preview {
+.import-error,
+.import-preview {
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 12px;
 }
-.admin-shell .import-error {
+.import-error {
   border: 1px solid #7f293d;
   background: #2b151b;
   color: #ff9bb2;
 }
-.admin-shell .import-preview {
+.import-preview {
   display: flex;
   flex-direction: column;
   gap: 3px;
   background: #1d1e22;
   color: #fff;
 }
-.admin-shell .import-preview span {
+.import-preview span {
   color: var(--muted2);
 }
-.admin-shell .import-foot {
+.import-foot {
   border-top: 1px solid #232429;
 }
-.admin-shell .import-foot > div {
+.import-foot > div {
   display: flex;
   gap: 9px;
 }
-.admin-shell button:disabled {
+.import-modal button:disabled {
   opacity: .45;
   cursor: not-allowed;
 }
 @media (max-width: 620px) {
-  .admin-shell .import-foot {
+  .import-foot {
     align-items: stretch;
     flex-direction: column;
   }
-  .admin-shell .import-foot > div {
+  .import-foot > div {
     justify-content: flex-end;
   }
 }
