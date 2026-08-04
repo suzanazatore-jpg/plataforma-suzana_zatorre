@@ -19,6 +19,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { CourseTabs } from '@/app/area/course-tabs';
 import { MaterialDownload } from '@/app/area/material-download';
 import './evs.css';
+import { AssistenteEvs } from './assistente-evs';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -318,6 +319,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
         </aside>
       </div>
 
+      <AssistenteEvs />
     </div>
   );
 }
