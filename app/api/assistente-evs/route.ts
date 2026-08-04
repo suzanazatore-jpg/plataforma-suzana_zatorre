@@ -20,6 +20,66 @@ function cleanSupportMarker(answer: string) {
   return answer.replace(/^\s*\[PRECISA_SUPORTE\]\s*/i, '').trim();
 }
 
+type KnowledgeItem = {
+  lesson_number: number;
+  title: string;
+  content: string;
+  sort_order?: number;
+};
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function buildRelevantKnowledge(items: KnowledgeItem[], question: string) {
+  const terms = Array.from(
+    new Set(
+      normalizeSearchText(question)
+        .split(/[^a-z0-9]+/)
+        .filter((term) => term.length >= 3)
+    )
+  );
+
+  const ranked = items
+    .map((item, index) => {
+      const title = normalizeSearchText(item.title);
+      const body = normalizeSearchText(item.content);
+      const score = terms.reduce((total, term) => {
+        const titleMatches = title.split(term).length - 1;
+        const bodyMatches = body.split(term).length - 1;
+        return total + titleMatches * 8 + Math.min(bodyMatches, 12);
+      }, 0);
+
+      return { item, index, score };
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const selected: KnowledgeItem[] = [];
+  let usedLength = 0;
+
+  for (const entry of ranked) {
+    const blockLength = entry.item.title.length + entry.item.content.length + 40;
+    if (usedLength + blockLength > MAX_KNOWLEDGE_LENGTH) continue;
+    selected.push(entry.item);
+    usedLength += blockLength;
+  }
+
+  return selected
+    .sort(
+      (a, b) =>
+        a.lesson_number - b.lesson_number ||
+        (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    )
+    .map(
+      (item) =>
+        `AULA ${item.lesson_number} — ${item.title}\n${item.content}`
+    )
+    .join('\n\n');
+}
+
 function parseAssistantResult(payload: unknown): AssistantResult {
   const fallback: AssistantResult = {
     answer:
@@ -206,7 +266,7 @@ export async function POST(request: NextRequest) {
 
   const { data: knowledge, error: knowledgeError } = await auth.supabase
     .from('evs_assistant_knowledge')
-    .select('lesson_number, title, content')
+    .select('lesson_number, title, content, sort_order')
     .order('lesson_number', { ascending: true })
     .order('sort_order', { ascending: true });
 
@@ -217,13 +277,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const knowledgeText = (knowledge ?? [])
-    .map(
-      (item) =>
-        `AULA ${item.lesson_number} — ${item.title}\n${item.content}`
-    )
-    .join('\n\n')
-    .slice(0, MAX_KNOWLEDGE_LENGTH);
+  const knowledgeText = buildRelevantKnowledge(
+    (knowledge ?? []) as KnowledgeItem[],
+    question
+  );
 
   if (!knowledgeText) {
     return NextResponse.json(
