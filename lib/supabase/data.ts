@@ -85,7 +85,7 @@ export async function getPublishedCourses() {
   return data.map(mapCourse);
 }
 
-export async function getPublishedCourseShelves(courses: Awaited<ReturnType<typeof getPublishedCourses>>) {
+export async function getPublishedCourseShelves<T extends { dbId?: string }>(courses: T[]) {
   const supabase = createSupabaseServerClient();
   if (!supabase || !courses.length) return [];
 
@@ -116,7 +116,7 @@ export async function getPublishedCourseShelves(courses: Awaited<ReturnType<type
         .filter((link) => link.shelf_id === shelf.id)
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((link) => coursesById.get(link.course_id))
-        .filter((course): course is (typeof courses)[number] => Boolean(course))
+        .filter((course): course is T => Boolean(course))
     }))
     .filter((shelf) => shelf.courses.length > 0);
 }
