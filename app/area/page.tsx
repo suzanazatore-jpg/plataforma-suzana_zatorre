@@ -122,7 +122,7 @@ export default async function MemberAreaPage() {
                         <span className="play">
                           <PlayCircle size={18} />
                         </span>
-                        {course.coverImageUrl ? (
+                        {'coverImageUrl' in course && typeof course.coverImageUrl === 'string' && course.coverImageUrl ? (
                           <img className="mh-cover" src={course.coverImageUrl} alt={`Capa do curso ${course.title}`} />
                         ) : null}
                         <span className="mh-card-copy">
