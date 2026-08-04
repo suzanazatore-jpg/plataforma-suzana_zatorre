@@ -105,20 +105,18 @@ export async function getPublishedCourseShelves<T>(courses: T[]) {
 
   if (linksError) return [];
 
-  const coursesById = new Map(
-    courses.flatMap((course) => {
-      if (
-        typeof course === 'object' &&
-        course !== null &&
-        'dbId' in course &&
-        typeof course.dbId === 'string'
-      ) {
-        return [[course.dbId, course] as const];
-      }
+  const coursesById = new Map<string, T>();
 
-      return [];
-    })
-  );
+  courses.forEach((course) => {
+    if (
+      typeof course === 'object' &&
+      course !== null &&
+      'dbId' in course &&
+      typeof course.dbId === 'string'
+    ) {
+      coursesById.set(course.dbId, course);
+    }
+  });
 
   return shelves
     .map((shelf) => ({
