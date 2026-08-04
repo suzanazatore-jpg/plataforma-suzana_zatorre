@@ -11,7 +11,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { supportUrl } from '@/lib/course';
-import { getEnrolledCourses, getPublishedCourses } from '@/lib/supabase/data';
+import { getEnrolledCourses, getPublishedCourses, getPublishedCourseShelves } from '@/lib/supabase/data';
 import { getCurrentStudent } from '@/lib/supabase/session';
 import { CarrosselMais } from './carrossel-mais';
 import './area-home.css';
@@ -29,6 +29,10 @@ export default async function MemberAreaPage() {
   const courses = isAdmin
     ? await getPublishedCourses()
     : await getEnrolledCourses();
+  const publishedShelves = await getPublishedCourseShelves(courses);
+  const courseShelves = publishedShelves.length
+    ? publishedShelves
+    : [{ id: 'meus-cursos', title: 'Meus Cursos', subtitle: '', courses }];
 
   return (
     <div className="member-home">
@@ -99,40 +103,44 @@ export default async function MemberAreaPage() {
         </section>
 
         <section className="mh-courses" id="cursos">
-          <div className="mh-section">
-            <span>(I)</span> Meus Cursos
-          </div>
+          {courseShelves.map((shelf, shelfIndex) => (
+            <div key={shelf.id}>
+              <div className="mh-section">
+                <span>({shelfIndex + 1})</span> {shelf.title}
+              </div>
 
-          <div className="mh-scroll">
-          <div className="mh-grid">
-            {courses.map((course) => {
-              const Icon = course.icon;
-              return (
-                <a
-                  className="mh-card"
-                  key={course.id}
-                  href={course.href}
-                >
-                  <span className="play">
-                    <PlayCircle size={18} />
-                  </span>
-                  {'coverImageUrl' in course && typeof course.coverImageUrl === 'string' && course.coverImageUrl ? (
-                    <img className="mh-cover" src={course.coverImageUrl} alt={`Capa do curso ${course.title}`} />
-                  ) : null}
-                  <span className="mh-card-copy">
-                  <span className="eyebrow">{course.eyebrow}</span>
-                  <h3>{course.title}</h3>
-                  <span className="ic">
-                    <Icon size={44} />
-                  </span>
-                  <span className="foot">{course.duration}</span>
-                  </span>
-                </a>
-              );
-            })}
-          </div>
-          <CarrosselMais />
-          </div>
+              <div className="mh-scroll">
+                <div className="mh-grid">
+                  {shelf.courses.map((course) => {
+                    const Icon = course.icon;
+                    return (
+                      <a
+                        className="mh-card"
+                        key={course.id}
+                        href={course.href}
+                      >
+                        <span className="play">
+                          <PlayCircle size={18} />
+                        </span>
+                        {course.coverImageUrl ? (
+                          <img className="mh-cover" src={course.coverImageUrl} alt={`Capa do curso ${course.title}`} />
+                        ) : null}
+                        <span className="mh-card-copy">
+                          <span className="eyebrow">{course.eyebrow}</span>
+                          <h3>{course.title}</h3>
+                          <span className="ic">
+                            <Icon size={44} />
+                          </span>
+                          <span className="foot">{course.duration}</span>
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
+                <CarrosselMais />
+              </div>
+            </div>
+          ))}
         </section>
 
         <footer className="mh-footer">
