@@ -145,15 +145,17 @@ function useEscClose(onClose: () => void) {
 type AulaModalProps = {
   courseId: string;
   moduleId: string;
-  aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean };
+  aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean; materials?: { id: string; title: string; file_url?: string }[] };
   salvar: (d: { id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean; sortOrder?: number }) => Promise<Resultado>;
+  salvarMaterial?: (d: any) => Promise<Resultado>;
+  apagarMaterial?: (id: string, fileUrl: string) => Promise<Resultado>;
   onClose: () => void;
 };
 
-function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps) {
+function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMaterial, onClose }: AulaModalProps) {
   const router = useRouter();
   const capaInput = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<'dados' | 'video'>('dados');
+  const [tab, setTab] = useState<'dados' | 'video' | 'materiais'>('dados');
   const [title, setTitle] = useState(aula?.title || '');
   const [duration, setDuration] = useState(aula?.duration_label || '');
   const [description, setDescription] = useState(aula?.description || '');
@@ -213,6 +215,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
         <div className="sza-tabs">
           <button className={`sza-tab ${tab === 'dados' ? 'on' : ''}`} onClick={() => setTab('dados')}><span className="n">1</span>Dados</button>
           <button className={`sza-tab ${tab === 'video' ? 'on' : ''}`} onClick={() => setTab('video')}><span className="n">2</span>Vídeo</button>
+          <button className={`sza-tab ${tab === 'materiais' ? 'on' : ''}`} onClick={() => setTab('materiais')}><span className="n">3</span>Materiais</button>
         </div>
 
         <div className="sza-body">
@@ -250,13 +253,39 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
                 </div>
               </div>
             </>
-          ) : (
+          ) : tab === 'video' ? (
             <div className="sza-f">
               <label>Link do vídeo<span className="hint">opcional — dá pra adicionar depois</span></label>
               <input className="sza-in" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="Cole aqui a URL do vídeo" />
               <div style={{ color: '#6f6f77', fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
                 Funciona com YouTube, Vimeo, PandaVídeo e Bunny. Cole o link da página do vídeo.
               </div>
+            </div>
+          ) : (
+            <div>
+              {!aula ? (
+                <div style={{ color: '#9a9aa2', fontSize: 13.5, lineHeight: 1.6, padding: '6px 0' }}>
+                  Salve a aula primeiro (na aba <b style={{ color: '#f5f5f7' }}>Dados</b>) para poder adicionar materiais de apoio.
+                </div>
+              ) : (
+                <div className="sza-f" style={{ marginBottom: 0 }}>
+                  <label>Materiais de apoio<span className="hint">PDF ou link, para a aluna baixar</span></label>
+                  {aula.materials && aula.materials.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                      {aula.materials.map((m) => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#232327', borderRadius: 11, padding: '10px 12px' }}>
+                          <span style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,46,99,.14)', color: '#ff2e63', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 800, flex: 'none' }}>PDF</span>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</div>
+                          {apagarMaterial ? <MaterialDeleteButton material={m} apagar={apagarMaterial} /> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#6f6f77', fontSize: 12.5, marginBottom: 12 }}>Nenhum material de apoio nesta aula ainda.</div>
+                  )}
+                  {salvarMaterial ? <MaterialButton courseId={courseId} lessonId={aula.id} salvar={salvarMaterial} label="Adicionar material de apoio" /> : null}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -270,13 +299,15 @@ function AulaModal({ courseId, moduleId, aula, salvar, onClose }: AulaModalProps
   );
 }
 
-export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, semSetas }: {
+export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, semSetas, salvarMaterial, apagarMaterial }: {
   courseId: string; moduleId: string;
-  aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean };
+  aula?: { id: string; title: string; slug: string; description: string; video_url: string; thumbnail_url: string; duration_label: string; sort_order: number; is_published: boolean; materials?: { id: string; title: string; file_url?: string }[] };
   salvar: (d: { id?: string; courseId: string; moduleId: string; title: string; slug: string; description: string; videoUrl: string; thumbnailUrl: string; duration: string; publicada: boolean; sortOrder?: number }) => Promise<Resultado>;
   apagar: (id: string) => Promise<Resultado>;
   mover?: (id: string, moduleId: string, direcao: 'cima' | 'baixo') => Promise<Resultado>;
   semSetas?: boolean;
+  salvarMaterial?: (d: any) => Promise<Resultado>;
+  apagarMaterial?: (id: string, fileUrl: string) => Promise<Resultado>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -288,7 +319,7 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, s
   if (!aula) {
     return <>
       <button onClick={() => setOpen(true)}><Plus size={14} /> Adicionar aula neste módulo</button>
-      {open && <AulaModal courseId={courseId} moduleId={moduleId} salvar={salvar} onClose={() => setOpen(false)} />}
+      {open && <AulaModal courseId={courseId} moduleId={moduleId} salvar={salvar} salvarMaterial={salvarMaterial} apagarMaterial={apagarMaterial} onClose={() => setOpen(false)} />}
     </>;
   }
   return <>
@@ -296,7 +327,7 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, s
     {!semSetas && <span className="iconbtn" title="Descer posição" onClick={() => move('baixo')}><ChevronDown size={14} /></span>}
     <span className="iconbtn" title="Editar" onClick={() => setOpen(true)}><Pencil size={14} /></span>
     <span className="iconbtn" title="Remover" onClick={del}><Trash2 size={14} /></span>
-    {open && <AulaModal courseId={courseId} moduleId={moduleId} aula={aula} salvar={salvar} onClose={() => setOpen(false)} />}
+    {open && <AulaModal courseId={courseId} moduleId={moduleId} aula={aula} salvar={salvar} salvarMaterial={salvarMaterial} apagarMaterial={apagarMaterial} onClose={() => setOpen(false)} />}
   </>;
 }
 
@@ -682,13 +713,14 @@ const GRIP_SVG = (
   </svg>
 );
 
-export function AulasDoModulo({ courseId, moduleId, aulas: aulasIniciais, salvarAula, apagarAula, salvarMaterial, reordenar }: {
+export function AulasDoModulo({ courseId, moduleId, aulas: aulasIniciais, salvarAula, apagarAula, salvarMaterial, apagarMaterial, reordenar }: {
   courseId: string;
   moduleId: string;
   aulas: any[];
   salvarAula: (d: any) => Promise<Resultado>;
   apagarAula: (id: string) => Promise<Resultado>;
   salvarMaterial: (d: any) => Promise<Resultado>;
+  apagarMaterial?: (id: string, fileUrl: string) => Promise<Resultado>;
   reordenar: (moduleId: string, ids: string[]) => Promise<Resultado>;
 }) {
   const router = useRouter();
@@ -771,9 +803,8 @@ export function AulasDoModulo({ courseId, moduleId, aulas: aulasIniciais, salvar
           <div className="lname"><b>{a.title}</b><small>{a.video_url ? 'Vídeo conectado' : 'Sem vídeo ainda'} · {a.materials?.length || 0} materiais</small></div>
           <span className="ldur">{a.duration_label || '—'}</span>
           <span className={`lstate ${a.is_published ? 'pub' : 'dr'}`}>{a.is_published ? 'Publicada' : 'Rascunho'}</span>
-          <MaterialButton courseId={courseId} lessonId={a.id} salvar={salvarMaterial} />
           <span className="iconbtn" title="Arraste para reordenar" data-handle style={{ cursor: 'grab', touchAction: 'none' }} onPointerDown={(e) => onDown(e, a.id)}>{GRIP_SVG}</span>
-          <AulaActions courseId={courseId} moduleId={moduleId} aula={{ ...a, description: a.description || '', video_url: a.video_url || '', thumbnail_url: a.thumbnail_url || '', duration_label: a.duration_label || '', sort_order: a.sort_order || 0 }} salvar={salvarAula} apagar={apagarAula} semSetas />
+          <AulaActions courseId={courseId} moduleId={moduleId} aula={{ ...a, description: a.description || '', video_url: a.video_url || '', thumbnail_url: a.thumbnail_url || '', duration_label: a.duration_label || '', sort_order: a.sort_order || 0 }} salvar={salvarAula} apagar={apagarAula} salvarMaterial={salvarMaterial} apagarMaterial={apagarMaterial} semSetas />
         </div>
       ))}
     </div>
