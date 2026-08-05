@@ -377,8 +377,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!openAIResponse?.ok) {
+      const providerStatus = openAIResponse?.status ?? 0;
+      const diagnosticCode = providerStatus
+        ? `EVS-${providerStatus}`
+        : 'EVS-CONEXAO';
+
       return NextResponse.json(
-        { error: 'A assistente está temporariamente indisponível.' },
+        {
+          error:
+            `A assistente está temporariamente indisponível. Código ${diagnosticCode}.`
+        },
         { status: 502 }
       );
     }
