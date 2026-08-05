@@ -237,12 +237,46 @@ async function apagarUsuario(dados: { id: string; emailConfirmacao: string }): P
 }
 
 
-async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
+async function importarUsuarios(
+  dados: AlunaImportada[],
+  opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[] }
+): Promise<Resultado> {
   'use server';
   const supabase = await validarAdministradora();
   if (!supabase) return { ok: false, mensagem: 'Somente uma administradora conectada pode importar alunas.' };
   if (!Array.isArray(dados) || dados.length === 0) return { ok: false, mensagem: 'A planilha não contém alunas para importar.' };
-  if (dados.length > 500) return { ok: false, mensagem: 'Importe no máximo 500 alunas por vez.' };
+
+  const enviarBoasVindas = Boolean(opcoes?.enviarBoasVindas);
+  const limite = enviarBoasVindas ? 100 : 500;
+  if (dados.length > limite) {
+    return {
+      ok: false,
+      mensagem: enviarBoasVindas
+        ? 'Com envio de e-mail, importe no máximo 100 alunas por vez (pra não estourar o tempo do servidor). Faça em levas.'
+        : 'Importe no máximo 500 alunas por vez.'
+    };
+  }
+
+  // Cursos a liberar — os mesmos para todas as alunas da planilha.
+  const cursoIds = Array.from(new Set((opcoes?.cursoIds || []).map((id) => String(id).trim()).filter(Boolean)));
+  let cursosSelecionados: CursoOpcao[] = [];
+  if (cursoIds.length) {
+    if (cursoIds.some((id) => !UUID.test(id))) return { ok: false, mensagem: 'Um dos cursos selecionados é inválido.' };
+    const { data: cursosData, error: cursosErro } = await supabase
+      .from('courses')
+      .select('id, title, slug')
+      .in('id', cursoIds);
+    if (cursosErro || !cursosData || cursosData.length !== cursoIds.length) {
+      return { ok: false, mensagem: 'Não foi possível confirmar os cursos selecionados. Tente de novo.' };
+    }
+    cursosSelecionados = cursosData;
+  }
+
+  const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
+  if (enviarBoasVindas && !pabblyUrl) {
+    return { ok: false, mensagem: 'O envio de e-mail não está configurado (Pabbly). Desligue o envio de e-mail ou configure antes de importar.' };
+  }
+  const cursoPrincipal = cursosSelecionados[0] || null;
 
   const unicas = new Map<string, AlunaImportada>();
   let invalidas = 0;
@@ -260,6 +294,7 @@ async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
   let criadas = 0;
   let duplicadas = dados.length - invalidas - unicas.size;
   let falhas = 0;
+  let emailsFalharam = 0;
 
   for (const aluna of Array.from(unicas.values())) {
     const { data: perfilExistente } = await supabase
@@ -273,9 +308,11 @@ async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
       continue;
     }
 
-    // Criação silenciosa: sem senha, sem e-mail, sem WhatsApp e sem matrícula automática.
+    const senhaProvisoria = enviarBoasVindas ? gerarSenhaProvisoria() : null;
+
     const { data: authData, error: authErro } = await supabase.auth.admin.createUser({
       email: aluna.email,
+      ...(senhaProvisoria ? { password: senhaProvisoria } : {}),
       email_confirm: true,
       user_metadata: { name: aluna.nome, phone: aluna.telefone || null, source: 'csv_import' }
     });
@@ -301,6 +338,60 @@ async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
       falhas++;
       continue;
     }
+
+    // Libera os cursos escolhidos (todas as alunas recebem os mesmos).
+    for (const curso of cursosSelecionados) {
+      await supabase.from('enrollments').upsert(
+        {
+          profile_id: authData.user.id,
+          course_id: curso.id,
+          status: 'active',
+          source: 'csv_import',
+          purchased_at: new Date().toISOString()
+        },
+        { onConflict: 'profile_id,course_id' }
+      );
+    }
+
+    // E-mail de boas-vindas com a senha — mesmo fluxo do Pabbly usado no cadastro individual.
+    if (enviarBoasVindas && senhaProvisoria && pabblyUrl) {
+      try {
+        const { data: recovery } = await supabase.auth.admin.generateLink({
+          type: 'recovery',
+          email: aluna.email,
+          options: { redirectTo: `${academyUrl()}/recuperar-senha` }
+        });
+        if (!recovery?.properties?.action_link) {
+          emailsFalharam++;
+        } else {
+          const pabblyResponse = await fetch(pabblyUrl, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              event: 'academy_access_created',
+              transaction_id: `csv-${crypto.randomUUID()}`,
+              first_name: primeiroNome(aluna.nome),
+              full_name: aluna.nome,
+              email: aluna.email,
+              phone: aluna.telefone || null,
+              product_id: cursoPrincipal?.id || null,
+              product_name: cursoPrincipal?.title || 'Importação em massa',
+              course_slug: cursoPrincipal?.slug || null,
+              course_name: cursoPrincipal?.title || null,
+              academy_url: `${academyUrl()}/login`,
+              is_new_user: true,
+              temporary_password: senhaProvisoria,
+              password_setup_url: recovery.properties.action_link
+            }),
+            cache: 'no-store'
+          });
+          if (!pabblyResponse.ok) emailsFalharam++;
+        }
+      } catch {
+        emailsFalharam++;
+      }
+    }
+
     criadas++;
   }
 
@@ -309,7 +400,13 @@ async function importarUsuarios(dados: AlunaImportada[]): Promise<Resultado> {
   if (duplicadas) partes.push(`${duplicadas} duplicada${duplicadas === 1 ? '' : 's'} ignorada${duplicadas === 1 ? '' : 's'}`);
   if (invalidas) partes.push(`${invalidas} linha${invalidas === 1 ? '' : 's'} inválida${invalidas === 1 ? '' : 's'}`);
   if (falhas) partes.push(`${falhas} falha${falhas === 1 ? '' : 's'}`);
-  return { ok: falhas === 0, mensagem: `Importação concluída: ${partes.join(', ')}. Nenhum aviso ou senha foi enviado.` };
+  const cursoMsg = cursosSelecionados.length
+    ? ` Cursos liberados: ${cursosSelecionados.map((c) => c.title).join(', ')}.`
+    : ' Nenhum curso liberado.';
+  const emailMsg = enviarBoasVindas
+    ? (emailsFalharam ? ` E-mails enviados, mas ${emailsFalharam} não saíram.` : ' E-mails de boas-vindas enviados com a senha.')
+    : ' Nenhuma mensagem foi enviada.';
+  return { ok: falhas === 0, mensagem: `Importação concluída: ${partes.join(', ')}.${cursoMsg}${emailMsg}` };
 }
 
 function formatarData(data?: string | null) {
@@ -375,7 +472,7 @@ export default async function UsuariosPage() {
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
       <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
-      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
+      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} cursos={cursos} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
         {alunas.length === 0 ? <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center' }}>Nenhuma aluna cadastrada.</td></tr> : alunas.map((a) => <tr key={a.id}>
