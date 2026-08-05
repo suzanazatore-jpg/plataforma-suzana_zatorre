@@ -74,6 +74,33 @@ function cleanSupportMarker(answer: string) {
   return answer.replace(/^\s*\[PRECISA_SUPORTE\]\s*/i, '').trim();
 }
 
+function extractResponseText(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return '';
+
+  const outputText = (payload as { output_text?: unknown }).output_text;
+  if (typeof outputText === 'string' && outputText.trim()) {
+    return outputText.trim();
+  }
+
+  const output = (payload as { output?: unknown }).output;
+  if (!Array.isArray(output)) return '';
+
+  return output
+    .flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const content = (item as { content?: unknown }).content;
+      if (!Array.isArray(content)) return [];
+
+      return content.flatMap((part) => {
+        if (!part || typeof part !== 'object') return [];
+        const text = (part as { text?: unknown }).text;
+        return typeof text === 'string' ? [text] : [];
+      });
+    })
+    .join('\n')
+    .trim();
+}
+
 type KnowledgeItem = {
   lesson_number: number;
   title: string;
@@ -143,8 +170,8 @@ function parseAssistantResult(payload: unknown): AssistantResult {
 
   if (!payload || typeof payload !== 'object') return fallback;
 
-  const outputText = (payload as { output_text?: unknown }).output_text;
-  if (typeof outputText !== 'string' || !outputText.trim()) return fallback;
+  const outputText = extractResponseText(payload);
+  if (!outputText) return fallback;
 
   try {
     const parsed = JSON.parse(outputText) as Partial<AssistantResult>;
