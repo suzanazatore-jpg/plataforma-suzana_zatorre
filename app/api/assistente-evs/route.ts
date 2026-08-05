@@ -10,11 +10,65 @@ export const dynamic = 'force-dynamic';
 
 const MAX_QUESTION_LENGTH = 2000;
 const MAX_KNOWLEDGE_LENGTH = 60000;
+const DEFAULT_OPENAI_MODEL = 'gpt-5-mini';
 
 type AssistantResult = {
   answer: string;
   needs_human_support: boolean;
 };
+
+type OpenAIErrorPayload = {
+  error?: {
+    code?: string;
+    message?: string;
+    type?: string;
+  };
+};
+
+async function requestOpenAI(apiKey: string, requestBody: Record<string, unknown>) {
+  const configuredModel = process.env.OPENAI_MODEL?.trim();
+  const models = Array.from(
+    new Set([configuredModel, DEFAULT_OPENAI_MODEL].filter(Boolean) as string[])
+  );
+
+  let lastResponse: Response | null = null;
+
+  for (const model of models) {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ...requestBody, model })
+    });
+
+    if (response.ok) return response;
+
+    lastResponse = response;
+    const errorPayload = (await response
+      .clone()
+      .json()
+      .catch(() => ({}))) as OpenAIErrorPayload;
+
+    console.error('OpenAI Assistente EVS:', {
+      status: response.status,
+      model,
+      requestId: response.headers.get('x-request-id'),
+      code: errorPayload.error?.code,
+      type: errorPayload.error?.type,
+      message: errorPayload.error?.message
+    });
+
+    const canTryFallback =
+      model !== DEFAULT_OPENAI_MODEL &&
+      [400, 403, 404].includes(response.status);
+
+    if (!canTryFallback) break;
+  }
+
+  return lastResponse;
+}
 
 function cleanSupportMarker(answer: string) {
   return answer.replace(/^\s*\[PRECISA_SUPORTE\]\s*/i, '').trim();
@@ -292,46 +346,37 @@ export async function POST(request: NextRequest) {
   let assistantResult: AssistantResult;
 
   try {
-    const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
-        store: false,
-        max_output_tokens: 900,
-        instructions: EVS_ASSISTANT_INSTRUCTIONS,
-        input: [
-          {
-            role: 'user',
-            content:
-              `BASE DE CONHECIMENTO EVS:\n${knowledgeText}\n\n` +
-              `PERGUNTA ATUAL DA ALUNA:\n${question}`
-          }
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'evs_support_answer',
-            strict: true,
-            schema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                answer: { type: 'string' },
-                needs_human_support: { type: 'boolean' }
-              },
-              required: ['answer', 'needs_human_support']
-            }
+    const openAIResponse = await requestOpenAI(apiKey, {
+      store: false,
+      max_output_tokens: 900,
+      instructions: EVS_ASSISTANT_INSTRUCTIONS,
+      input: [
+        {
+          role: 'user',
+          content:
+            `BASE DE CONHECIMENTO EVS:\n${knowledgeText}\n\n` +
+            `PERGUNTA ATUAL DA ALUNA:\n${question}`
+        }
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'evs_support_answer',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              answer: { type: 'string' },
+              needs_human_support: { type: 'boolean' }
+            },
+            required: ['answer', 'needs_human_support']
           }
         }
-      })
+      }
     });
 
-    if (!openAIResponse.ok) {
-      console.error('OpenAI Assistente EVS:', openAIResponse.status);
+    if (!openAIResponse?.ok) {
       return NextResponse.json(
         { error: 'A assistente está temporariamente indisponível.' },
         { status: 502 }
