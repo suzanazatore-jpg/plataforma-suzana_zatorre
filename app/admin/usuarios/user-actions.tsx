@@ -20,7 +20,7 @@ type EditarUsuario = (dados: {
 }) => Promise<Resultado>;
 type ApagarUsuario = (dados: { id: string; emailConfirmacao: string }) => Promise<Resultado>;
 type AlunaImportada = { nome: string; email: string; telefone?: string };
-type ImportarUsuarios = (dados: AlunaImportada[]) => Promise<Resultado>;
+type ImportarUsuarios = (dados: AlunaImportada[], opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[] }) => Promise<Resultado>;
 
 function mostrarResultado(resultado: Resultado) {
   window.alert(resultado.mensagem);
@@ -51,7 +51,7 @@ function lerCsv(conteudo: string): AlunaImportada[] {
   }).filter((item) => item.nome || item.email);
 }
 
-export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: ImportarUsuarios }) {
+export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { importarUsuarios: ImportarUsuarios; cursos?: CursoOpcao[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [aberto, setAberto] = useState(false);
@@ -59,6 +59,11 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
   const [arquivoNome, setArquivoNome] = useState('');
   const [alunas, setAlunas] = useState<AlunaImportada[]>([]);
   const [erro, setErro] = useState('');
+  const [enviarBoasVindas, setEnviarBoasVindas] = useState(false);
+  const [cursoIds, setCursoIds] = useState<string[]>([]);
+
+  const alternarCurso = (id: string) =>
+    setCursoIds((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
 
   function fechar() {
     if (processando) return;
@@ -66,6 +71,8 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
     setArquivoNome('');
     setAlunas([]);
     setErro('');
+    setEnviarBoasVindas(false);
+    setCursoIds([]);
   }
 
   async function carregarArquivo(arquivo?: File) {
@@ -95,7 +102,7 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
     setProcessando(true);
     setErro('');
     try {
-      const resultado = await importarUsuarios(alunas);
+      const resultado = await importarUsuarios(alunas, { enviarBoasVindas, cursoIds });
       if (!resultado.ok) {
         setErro(resultado.mensagem);
         return;
@@ -134,8 +141,10 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
 
             <div className="import-body">
               <div className="import-notice">
-                <span>🔕</span>
-                <p><b>Modo silencioso:</b> cria as contas sem enviar e-mail, WhatsApp nem senha. As alunas não recebem nenhuma mensagem. Você libera os cursos depois, na mão, quando quiser.</p>
+                <span>{enviarBoasVindas ? '📧' : '🔕'}</span>
+                <p>{enviarBoasVindas
+                  ? <><b>Com envio de e-mail:</b> cada aluna recebe login, senha provisória de 6 dígitos e link de acesso{cursoIds.length ? ' — já com o(s) curso(s) liberado(s)' : ''}.</>
+                  : <><b>Modo silencioso:</b> cria as contas sem enviar e-mail, WhatsApp nem senha.{cursoIds.length ? ' Os cursos escolhidos já ficam liberados.' : ' Você libera os cursos depois, na mão.'}</>}</p>
               </div>
 
               <p className="import-help">A planilha precisa ter as colunas <code>Nome</code>, <code>Email</code> e <code>Telefone</code> — uma aluna por linha. No Excel, salve como <code>CSV</code>.</p>
@@ -162,6 +171,57 @@ export function ListaUsuariosButtons({ importarUsuarios }: { importarUsuarios: I
                   <span>{alunas.slice(0, 3).map((a) => a.nome).join(' • ')}{alunas.length > 3 ? '…' : ''}</span>
                 </div>
               )}
+
+              <div className="iu-opts">
+                {cursos.length > 0 && (
+                  <div className="iu-block">
+                    <div className="iu-lbl">Liberar acesso aos cursos <small>(opcional — vale para todas)</small></div>
+                    <div className="iu-chips">
+                      {cursos.map((curso) => (
+                        <button
+                          key={curso.id}
+                          type="button"
+                          className={`iu-chip${cursoIds.includes(curso.id) ? ' on' : ''}`}
+                          onClick={() => alternarCurso(curso.id)}
+                        >
+                          {cursoIds.includes(curso.id) ? '✓ ' : ''}{curso.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <label className="iu-switch-row">
+                  <span className="iu-switch-copy">
+                    <strong>Enviar e-mail de boas-vindas com a senha</strong>
+                    <small>Manda login, senha provisória de 6 dígitos e link de acesso para cada aluna.</small>
+                  </span>
+                  <input type="checkbox" checked={enviarBoasVindas} onChange={(e) => setEnviarBoasVindas(e.target.checked)} />
+                  <span className="iu-switch" aria-hidden="true" />
+                </label>
+                {enviarBoasVindas && <div className="iu-hint">Com e-mail ligado, importe até <b>100</b> por vez pra não estourar o tempo do servidor. Acima disso, faça em levas.</div>}
+              </div>
+
+              <style>{`
+                .iu-opts{display:grid;gap:14px;margin-top:16px}
+                .iu-block{display:grid;gap:9px}
+                .iu-lbl{font-size:12.5px;font-weight:700;color:#f5f5f7}
+                .iu-lbl small{font-weight:500;color:#92929d}
+                .iu-chips{display:flex;flex-wrap:wrap;gap:8px}
+                .iu-chip{font:inherit;font-size:12.5px;font-weight:600;color:#c9c9d2;background:#1c1c20;border:1px solid #34343a;border-radius:999px;padding:8px 13px;cursor:pointer;transition:.15s}
+                .iu-chip:hover{border-color:#5a5a63}
+                .iu-chip.on{background:rgba(255,46,99,.16);border-color:#ff2e63;color:#fff}
+                .iu-switch-row{position:relative;display:flex;align-items:center;gap:11px;background:#1a1719;border:1px solid #40232c;border-radius:12px;padding:13px;cursor:pointer}
+                .iu-switch-copy{display:grid;gap:3px;flex:1}
+                .iu-switch-copy strong{font-size:12.5px}
+                .iu-switch-copy small{font-size:10.5px;color:#92929d;line-height:1.4}
+                .iu-switch-row input{position:absolute;opacity:0}
+                .iu-switch{width:42px;height:23px;border-radius:20px;background:#3a3a40;position:relative;flex:none;transition:.2s}
+                .iu-switch:after{content:'';position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.2s}
+                .iu-switch-row input:checked + .iu-switch{background:#ff2e63}
+                .iu-switch-row input:checked + .iu-switch:after{transform:translateX(19px)}
+                .iu-hint{font-size:11px;color:#c98aa0;line-height:1.5}
+              `}</style>
             </div>
 
             <div className="import-foot">
