@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, LockKeyhole, Mail } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import './login.css';
 
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [senha, setSenha] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [entrando, setEntrando] = useState(false);
+  const [verSenha, setVerSenha] = useState(false);
 
   async function entrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -90,13 +91,22 @@ export default function LoginPage() {
             <div className="field">
               <LockKeyhole size={18} />
               <input
-                type="password"
+                type={verSenha ? 'text' : 'password'}
                 placeholder="Digite sua senha"
                 autoComplete="current-password"
                 value={senha}
                 onChange={(evento) => setSenha(evento.target.value)}
                 required
               />
+              <button
+                type="button"
+                onClick={() => setVerSenha((valor) => !valor)}
+                aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                title={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                style={{ background: 'none', border: 0, padding: 4, margin: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', flex: 'none' }}
+              >
+                {verSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </label>
 
