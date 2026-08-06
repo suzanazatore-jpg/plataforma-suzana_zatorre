@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, Eye, Upload, ChevronUp, ChevronDown, Play } from 
 import { createClient } from '@/lib/supabase/client';
 
 type Resultado = { ok: boolean; mensagem: string; id?: string };
+type MaterialPendente = { id: string; title: string; mode: 'pdf' | 'link'; file?: File; link?: string };
 
 function slugify(valor: string) {
   return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -164,7 +165,10 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
   const [capaFile, setCapaFile] = useState<File | null>(null);
   const [capaPreview, setCapaPreview] = useState(aula?.thumbnail_url || '');
   const [busy, setBusy] = useState(false);
+  const [pendentes, setPendentes] = useState<MaterialPendente[]>([]);
   useEscClose(onClose);
+
+  const removerPendente = (id: string) => setPendentes((prev) => prev.filter((p) => p.id !== id));
 
   function escolherCapa(file?: File) {
     if (!file) return;
@@ -195,6 +199,39 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
       const slug = slugBase || `aula-${Date.now()}`;
       const r = await salvar({ id: aula?.id, courseId, moduleId, title: nome, slug, description: description.trim(), videoUrl: videoUrl.trim(), thumbnailUrl, duration: duration.trim(), publicada, sortOrder: aula?.sort_order });
       if (!r.ok) { window.alert(r.mensagem); return; }
+
+      // Aula NOVA + materiais em espera: agora temos o id recém-criado, então ligamos os materiais a ele.
+      if (!aula && pendentes.length && salvarMaterial) {
+        const novoId = r.id;
+        if (!novoId) {
+          window.alert('A aula foi criada, mas não consegui ligar os materiais automaticamente. Reabra a aula na aba Materiais para adicioná-los.');
+        } else {
+          const supabase = createClient();
+          const falhas: string[] = [];
+          for (const m of pendentes) {
+            try {
+              let fileUrl = '';
+              if (m.mode === 'link') {
+                fileUrl = (m.link || '').trim();
+              } else if (m.file) {
+                if (!supabase) { falhas.push(m.title); continue; }
+                const safe = m.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
+                const path = `${courseId}/${novoId}/${Date.now()}-${safe}`;
+                const up = await supabase.storage.from('course-materials').upload(path, m.file, { contentType: 'application/pdf', upsert: false });
+                if (up.error) { falhas.push(m.title); continue; }
+                fileUrl = `storage://course-materials/${path}`;
+              }
+              if (!fileUrl) { falhas.push(m.title); continue; }
+              const rm = await salvarMaterial({ courseId, lessonId: novoId, title: m.title, fileUrl });
+              if (!rm.ok) falhas.push(m.title);
+            } catch { falhas.push(m.title); }
+          }
+          if (falhas.length) {
+            window.alert(`A aula foi criada, mas ${falhas.length} material(is) não subiram: ${falhas.join(', ')}. Reabra a aula na aba Materiais para tentar de novo.`);
+          }
+        }
+      }
+
       onClose();
       router.refresh();
     } finally { setBusy(false); }
@@ -264,9 +301,29 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
           ) : (
             <div>
               {!aula ? (
-                <div style={{ color: '#9a9aa2', fontSize: 13.5, lineHeight: 1.6, padding: '6px 0' }}>
-                  Salve a aula primeiro (na aba <b style={{ color: '#f5f5f7' }}>Dados</b>) para poder adicionar materiais de apoio.
-                </div>
+                salvarMaterial ? (
+                  <div className="sza-f" style={{ marginBottom: 0 }}>
+                    <label>Materiais de apoio<span className="hint">PDF ou link — sobem junto quando você cadastrar a aula</span></label>
+                    {pendentes.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                        {pendentes.map((m) => (
+                          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#232327', borderRadius: 11, padding: '10px 12px' }}>
+                            <span style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,46,99,.14)', color: '#ff2e63', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 800, flex: 'none' }}>{m.mode === 'link' ? 'URL' : 'PDF'}</span>
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</div>
+                            <button type="button" onClick={() => removerPendente(m.id)} aria-label="Remover" style={{ background: 'none', border: 'none', color: '#9a9aa2', cursor: 'pointer', padding: 4, display: 'grid', placeItems: 'center' }}><Trash2 size={16} /></button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#6f6f77', fontSize: 12.5, marginBottom: 12, lineHeight: 1.6 }}>Nenhum material ainda. Adicione PDFs ou links — eles sobem junto quando você clicar em <b style={{ color: '#f5f5f7' }}>Cadastrar aula</b>.</div>
+                    )}
+                    <MaterialButton courseId={courseId} lessonId={null} salvar={salvarMaterial} label="Adicionar material de apoio" onStage={(m) => setPendentes((prev) => [...prev, m])} />
+                  </div>
+                ) : (
+                  <div style={{ color: '#9a9aa2', fontSize: 13.5, lineHeight: 1.6, padding: '6px 0' }}>
+                    Salve a aula primeiro (na aba <b style={{ color: '#f5f5f7' }}>Dados</b>) para poder adicionar materiais de apoio.
+                  </div>
+                )
               ) : (
                 <div className="sza-f" style={{ marginBottom: 0 }}>
                   <label>Materiais de apoio<span className="hint">PDF ou link, para a aluna baixar</span></label>
@@ -335,10 +392,11 @@ type MaterialModalProps = {
   courseId: string;
   lessonId: string | null;
   salvar: (d: { courseId: string; lessonId: string | null; title: string; fileUrl: string }) => Promise<Resultado>;
+  onStage?: (m: MaterialPendente) => void;
   onClose: () => void;
 };
 
-function MaterialModal({ courseId, lessonId, salvar, onClose }: MaterialModalProps) {
+function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: MaterialModalProps) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'pdf' | 'link'>('pdf');
@@ -360,6 +418,19 @@ function MaterialModal({ courseId, lessonId, salvar, onClose }: MaterialModalPro
   async function enviar() {
     const nome = title.trim();
     if (!nome) { window.alert('Dê um nome para o material.'); return; }
+    // Modo "em espera": guarda o material e devolve pro modal da aula, sem subir ainda.
+    if (onStage) {
+      if (mode === 'link') {
+        const url = link.trim();
+        if (!url) { window.alert('Cole o link do material.'); return; }
+        onStage({ id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: nome, mode: 'link', link: url });
+      } else {
+        if (!file) { window.alert('Escolha um PDF do computador.'); return; }
+        onStage({ id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: nome, mode: 'pdf', file });
+      }
+      onClose();
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'link') {
@@ -434,11 +505,11 @@ function MaterialModal({ courseId, lessonId, salvar, onClose }: MaterialModalPro
   );
 }
 
-export function MaterialButton({ courseId, lessonId, salvar, label = 'Material' }: { courseId: string; lessonId: string | null; salvar: (d: { courseId: string; lessonId: string | null; title: string; fileUrl: string }) => Promise<Resultado>; label?: string }) {
+export function MaterialButton({ courseId, lessonId, salvar, label = 'Material', onStage }: { courseId: string; lessonId: string | null; salvar: (d: { courseId: string; lessonId: string | null; title: string; fileUrl: string }) => Promise<Resultado>; label?: string; onStage?: (m: MaterialPendente) => void }) {
   const [open, setOpen] = useState(false);
   return <>
     <button className="btn-ghost" onClick={() => setOpen(true)}><Upload size={14} /> {label}</button>
-    {open && <MaterialModal courseId={courseId} lessonId={lessonId} salvar={salvar} onClose={() => setOpen(false)} />}
+    {open && <MaterialModal courseId={courseId} lessonId={lessonId} salvar={salvar} onStage={onStage} onClose={() => setOpen(false)} />}
   </>;
 }
 
