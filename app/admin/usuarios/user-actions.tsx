@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, Download, Upload, X, Filter, Mail, BookOpen, UserRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, X, Filter, Mail, BookOpen, UserRound, Clock } from 'lucide-react';
 
 type Resultado = { ok: boolean; mensagem: string };
 type CriarUsuario = (dados: {
@@ -10,6 +10,8 @@ type CriarUsuario = (dados: {
   email: string;
   telefone?: string;
   cursoId?: string;
+  tempoAcesso?: string;
+  dataFim?: string;
   enviarBoasVindas: boolean;
 }) => Promise<Resultado>;
 type CursoOpcao = { id: string; title: string; slug: string };
@@ -248,6 +250,8 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
   const [cursoId, setCursoId] = useState('');
+  const [tempo, setTempo] = useState('12m');
+  const [dataFim, setDataFim] = useState('');
   const [enviarBoasVindas, setEnviarBoasVindas] = useState(true);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
@@ -259,9 +263,25 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
     setEmail('');
     setTelefone('');
     setCursoId('');
+    setTempo('12m');
+    setDataFim('');
     setEnviarBoasVindas(true);
     setErro('');
     setSucesso('');
+  }
+
+  function dataVencimento(): Date | null {
+    const alvo = new Date();
+    if (tempo === '30d') alvo.setDate(alvo.getDate() + 30);
+    else if (tempo === '3m') alvo.setMonth(alvo.getMonth() + 3);
+    else if (tempo === '6m') alvo.setMonth(alvo.getMonth() + 6);
+    else if (tempo === '12m') alvo.setFullYear(alvo.getFullYear() + 1);
+    else if (tempo === 'custom') {
+      if (!dataFim) return null;
+      const fim = new Date(`${dataFim}T23:59:59`);
+      return Number.isNaN(fim.getTime()) ? null : fim;
+    } else return null;
+    return alvo;
   }
 
   async function cadastrar(event: React.FormEvent<HTMLFormElement>) {
@@ -272,6 +292,10 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
       setErro('Preencha o nome completo e um e-mail válido.');
       return;
     }
+    if (cursoId && tempo === 'custom' && !dataFim) {
+      setErro('Escolha a data em que o acesso deve terminar.');
+      return;
+    }
     setProcessando(true);
     try {
       const resultado = await criarUsuario({
@@ -279,6 +303,8 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
         email: email.trim().toLowerCase(),
         telefone,
         cursoId: cursoId || undefined,
+        tempoAcesso: cursoId ? tempo : undefined,
+        dataFim: cursoId && tempo === 'custom' ? dataFim : undefined,
         enviarBoasVindas
       });
       if (!resultado.ok) {
@@ -317,6 +343,25 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
               <label className="new-user-field"><span>Celular / WhatsApp <small>(opcional)</small></span><input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(84) 99999-9999" inputMode="tel" autoComplete="tel" /></label>
               <label className="new-user-field"><span>Curso a liberar <small>(opcional)</small></span><div className="new-user-select"><BookOpen size={16} /><select value={cursoId} onChange={(e) => setCursoId(e.target.value)}><option value="">Criar sem liberar curso</option>{cursos.map((curso) => <option key={curso.id} value={curso.id}>{curso.title}</option>)}</select></div><em>Você pode criar a conta sem curso e liberar o acesso depois.</em></label>
 
+              {cursoId && (
+                <div className="new-user-tempo">
+                  <div className="nu-tempo-lbl"><Clock size={15} /> Tempo de acesso</div>
+                  <div className="nu-chips">
+                    {([['30d', '30 dias'], ['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses'], ['custom', 'Data exata…']] as const).map(([valor, rotulo]) => (
+                      <button key={valor} type="button" className={`nu-chip${tempo === valor ? ' on' : ''}`} onClick={() => setTempo(valor)}>{rotulo}</button>
+                    ))}
+                  </div>
+                  {tempo === 'custom' && (
+                    <input type="date" className="nu-date" value={dataFim} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDataFim(e.target.value)} />
+                  )}
+                  <div className="nu-tempo-foot">
+                    {dataVencimento()
+                      ? <>Acesso liberado até <b>{new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza' }).format(dataVencimento() as Date)}</b>. Depois disso a aluna deixa de ver o curso automaticamente.</>
+                      : 'Escolha a data em que o acesso deve terminar.'}
+                  </div>
+                </div>
+              )}
+
               <label className="new-user-switch-row">
                 <span className="new-user-mail"><Mail size={17} /></span>
                 <span className="new-user-switch-copy"><strong>Enviar e-mail de boas-vindas com a senha</strong><small>Envia login, senha provisória de 6 dígitos e link de acesso.</small></span>
@@ -338,6 +383,7 @@ export function NovoUsuarioButton({ criarUsuario, cursos }: { criarUsuario: Cria
             .new-user-modal{width:min(570px,100%);max-height:calc(100dvh - 36px);overflow:auto;background:#111113;border:1px solid #2b2b31;border-radius:18px;box-shadow:0 28px 90px rgba(0,0,0,.65);color:#fff}
             .new-user-head,.new-user-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:19px 21px}.new-user-head{border-bottom:1px solid #25252a}.new-user-title-wrap{display:flex;align-items:center;gap:12px}.new-user-icon,.new-user-mail{display:grid;place-items:center;color:#ff2e63;background:#26151b;border-radius:10px}.new-user-icon{width:42px;height:42px}.new-user-head h3{font-size:19px;margin:0 0 3px}.new-user-head p{font-size:12px;color:#92929d;margin:0}.new-user-close{width:32px;height:32px;display:grid;place-items:center;background:#1c1c20;color:#aaa;border:1px solid #34343a;border-radius:8px;cursor:pointer}
             .new-user-body{display:grid;gap:15px;padding:20px 21px}.new-user-field{display:grid;gap:7px}.new-user-field>span{font-size:12px;font-weight:700;color:#ddd}.new-user-field b{color:#ff2e63}.new-user-field small,.new-user-field em{color:#858590;font-size:11px;font-weight:400;font-style:normal}.new-user-field input,.new-user-field select{width:100%;box-sizing:border-box;background:#1b1b1f;color:#fff;border:1px solid #35353b;border-radius:10px;padding:12px 13px;outline:none;font:500 14px Archivo,Arial,sans-serif}.new-user-field input:focus,.new-user-field select:focus{border-color:#ff2e63;box-shadow:0 0 0 3px rgba(255,46,99,.12)}.new-user-select{position:relative}.new-user-select svg{position:absolute;left:12px;top:13px;color:#ff2e63;pointer-events:none}.new-user-select select{padding-left:38px;appearance:none}.new-user-select option{background:#18181b}
+            .new-user-tempo{display:grid;gap:9px;background:#141013;border:1px solid #2a2023;border-radius:12px;padding:13px}.nu-tempo-lbl{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#ddd}.nu-tempo-lbl svg{color:#ff2e63}.nu-chips{display:flex;flex-wrap:wrap;gap:7px}.nu-chip{font:inherit;font-size:12.5px;font-weight:700;color:#c9c9d2;background:#1c1c20;border:1px solid #34343a;border-radius:999px;padding:8px 14px;cursor:pointer;transition:.15s}.nu-chip:hover{border-color:#5a5a63}.nu-chip.on{background:rgba(255,46,99,.16);border-color:#ff2e63;color:#fff}.nu-date{width:auto;background:#1b1b1f;color:#fff;border:1px solid #35353b;border-radius:10px;padding:10px 12px;outline:none;font:500 13px Archivo,Arial,sans-serif;color-scheme:dark}.nu-date:focus{border-color:#ff2e63}.nu-tempo-foot{font-size:11px;color:#8a8a93;line-height:1.5}.nu-tempo-foot b{color:#cbb9bd;font-weight:700}
             .new-user-switch-row{position:relative;display:flex;align-items:center;gap:11px;background:#1a1719;border:1px solid #40232c;border-radius:12px;padding:13px;cursor:pointer}.new-user-mail{width:34px;height:34px;flex:none}.new-user-switch-copy{display:grid;gap:3px;flex:1}.new-user-switch-copy strong{font-size:12px}.new-user-switch-copy small{font-size:10.5px;color:#92929d;line-height:1.4}.new-user-switch-row input{position:absolute;opacity:0}.new-user-switch{width:42px;height:23px;border-radius:20px;background:#3a3a40;position:relative;flex:none;transition:.2s}.new-user-switch:after{content:'';position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.2s}.new-user-switch-row input:checked+.new-user-switch{background:#ff2e63}.new-user-switch-row input:checked+.new-user-switch:after{transform:translateX(19px)}
             .new-user-silent,.new-user-error,.new-user-success{padding:11px 12px;border-radius:9px;font-size:12px;line-height:1.45}.new-user-silent{background:#181d25;border:1px solid #2d486c;color:#cbdaf1}.new-user-error{background:#2b151b;border:1px solid #7f293d;color:#ff9bb2}.new-user-success{background:#14241a;border:1px solid #286c3d;color:#9de8b3}.new-user-foot{border-top:1px solid #25252a;justify-content:flex-end}.new-user-foot button:disabled{opacity:.5;cursor:not-allowed}
             @media(max-width:620px){.new-user-overlay{padding:0;align-items:end}.new-user-modal{width:100%;max-height:94dvh;border-radius:18px 18px 0 0}.new-user-head,.new-user-foot{padding:16px}.new-user-body{padding:17px 16px}.new-user-switch-row{align-items:flex-start}.new-user-switch{margin-top:5px}.new-user-head p{max-width:230px}}
