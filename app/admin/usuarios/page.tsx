@@ -43,11 +43,32 @@ function gerarSenhaProvisoria() {
   return String(100000 + (randomValue % 900000));
 }
 
+// Converte o atalho de tempo (30d/3m/6m/12m) ou uma data exata (YYYY-MM-DD)
+// numa data de vencimento ISO. Retorna null quando não há prazo definido.
+function calcularExpiracao(tempo?: string, dataFim?: string): string | null {
+  const alvo = new Date();
+  switch ((tempo || '').trim()) {
+    case '30d': alvo.setDate(alvo.getDate() + 30); return alvo.toISOString();
+    case '3m': alvo.setMonth(alvo.getMonth() + 3); return alvo.toISOString();
+    case '6m': alvo.setMonth(alvo.getMonth() + 6); return alvo.toISOString();
+    case '12m': alvo.setFullYear(alvo.getFullYear() + 1); return alvo.toISOString();
+    case 'custom': {
+      const data = String(dataFim || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return null;
+      const fim = new Date(`${data}T23:59:59`);
+      return Number.isNaN(fim.getTime()) ? null : fim.toISOString();
+    }
+    default: return null;
+  }
+}
+
 async function criarUsuario(dados: {
   nome: string;
   email: string;
   telefone?: string;
   cursoId?: string;
+  tempoAcesso?: string;
+  dataFim?: string;
   enviarBoasVindas: boolean;
 }): Promise<Resultado> {
   'use server';
@@ -108,14 +129,17 @@ async function criarUsuario(dados: {
     return { ok: false, mensagem: 'O login foi criado, mas o cadastro da aluna falhou. Tente novamente.' };
   }
 
+  let expiracao: string | null = null;
   if (curso) {
+    expiracao = calcularExpiracao(dados.tempoAcesso, dados.dataFim);
     const { error: matriculaErro } = await supabase.from('enrollments').upsert(
       {
         profile_id: data.user.id,
         course_id: curso.id,
         status: 'active',
         source: 'admin_manual',
-        purchased_at: new Date().toISOString()
+        purchased_at: new Date().toISOString(),
+        expires_at: expiracao
       },
       { onConflict: 'profile_id,course_id' }
     );
@@ -169,7 +193,10 @@ async function criarUsuario(dados: {
   }
 
   revalidatePath('/admin/usuarios');
-  const acesso = curso ? ` e acesso ao curso “${curso.title}” liberado` : ' sem curso liberado';
+  const prazo = curso && expiracao
+    ? ` até ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza' }).format(new Date(expiracao))}`
+    : '';
+  const acesso = curso ? ` e acesso ao curso “${curso.title}” liberado${prazo}` : ' sem curso liberado';
   const envio = dados.enviarBoasVindas && !aviso ? ' E-mail de boas-vindas enviado.' : dados.enviarBoasVindas ? '' : ' Nenhuma mensagem foi enviada.';
   return { ok: true, mensagem: `Aluna cadastrada${acesso}.${envio}${aviso}` };
 }
