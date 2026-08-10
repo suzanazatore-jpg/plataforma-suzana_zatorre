@@ -1,0 +1,27 @@
+.admin-shell .blk-title { font-size: 22px; font-weight: 800; margin: 6px 0 4px; }
+.admin-shell .blk-sub { color: var(--muted2); font-size: 13px; margin: 0 0 18px; }
+.admin-shell .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+
+.admin-shell .btn-pink { background: var(--hot); border: 0; color: #fff; font-family: inherit; font-weight: 800; font-size: 13px; border-radius: 9px; padding: 11px 18px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; text-decoration: none; }
+
+.admin-shell .iconbtn { width: 34px; height: 34px; border-radius: 8px; background: #161213; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); cursor: pointer; text-decoration: none; }
+.admin-shell .iconbtn:hover { border-color: var(--hot); color: var(--hot); }
+.admin-shell .iconbtn.danger:hover { border-color: #e2554f; color: #ff6a63; }
+
+.admin-shell .pl-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); margin-top: 18px; }
+.admin-shell .pl-row { display: grid; grid-template-columns: 1.7fr 1fr 1fr auto; align-items: center; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+.admin-shell .pl-row:last-child { border-bottom: 0; }
+.admin-shell .pl-row:hover { background: var(--card2); }
+.admin-shell .pl-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.admin-shell .pl-ic { width: 38px; height: 38px; border-radius: 10px; background: rgba(255, 46, 99, 0.14); display: grid; place-items: center; color: var(--hot); flex: none; }
+.admin-shell .pl-name b { font-weight: 800; font-size: 14.5px; display: block; }
+.admin-shell .pl-name span { display: block; color: var(--muted2); font-size: 12px; margin-top: 2px; }
+.admin-shell .pl-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.admin-shell .pl-meta svg { color: var(--muted2); }
+.admin-shell .pl-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.admin-shell .pl-empty { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 26px; color: var(--muted2); font-size: 13px; margin-top: 18px; }
+
+@media (max-width: 760px) {
+  .admin-shell .pl-row { grid-template-columns: 1fr; align-items: flex-start; gap: 10px; }
+  .admin-shell .pl-actions { justify-content: flex-start; }
+}
