@@ -24,10 +24,11 @@ export default function RedefinirSenhaPage() {
       return;
     }
 
+    const clienteSupabase = supabase;
     let ativo = true;
 
     async function validar() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await clienteSupabase.auth.getSession();
       if (!ativo) return;
 
       if (data.session) {
@@ -41,7 +42,7 @@ export default function RedefinirSenhaPage() {
 
     validar();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((evento, sessao) => {
+    const { data: listener } = clienteSupabase.auth.onAuthStateChange((evento, sessao) => {
       if (!ativo) return;
       if ((evento === 'PASSWORD_RECOVERY' || evento === 'SIGNED_IN') && sessao) {
         setLinkValido(true);
