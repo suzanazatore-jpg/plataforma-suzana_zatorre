@@ -189,6 +189,70 @@
   color: #ff6a91;
 }
 
+.ep-course-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0 8px;
+}
+
+.ep-course-actions form {
+  display: contents;
+}
+
+.ep-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--hg-line);
+  color: var(--hg-muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px 22px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+
+.ep-nav-button:hover {
+  border-color: var(--hg-hot);
+  color: var(--hg-hot);
+}
+
+.ep-nav-button.disabled {
+  opacity: .35;
+  pointer-events: none;
+}
+
+.ep-complete-button {
+  border: 0;
+  background: var(--hg-hot);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 11px 26px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+
+.ep-complete-button:hover {
+  filter: brightness(1.06);
+}
+
+.ep-complete-button.completed {
+  background: transparent;
+  border: 1px solid #2f8f57;
+  color: #58d98a;
+  font-weight: 700;
+}
+
 .ep-materials {
   margin-top: 26px;
 }
