@@ -50,13 +50,13 @@ export default function AdminPage() {
                 <p>O texto que o aluno aceita no primeiro acesso (reembolso, regras).</p>
               </div>
             </Link>
-            <div className="acard dim">
+            <Link className="acard" href="/admin/planos">
               <span className="ic"><Layers size={24} /></span>
               <div>
-                <h3>Planos e Ofertas <span className="tag">depois</span></h3>
+                <h3>Planos e Ofertas</h3>
                 <p>Gerencie planos e ofertas de acesso aos cursos.</p>
               </div>
-            </div>
+            </Link>
             <div className="acard dim">
               <span className="ic"><UsersRound size={24} /></span>
               <div>
