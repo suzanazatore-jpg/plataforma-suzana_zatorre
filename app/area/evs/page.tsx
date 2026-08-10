@@ -18,6 +18,7 @@ import { getCurrentStudent, hasActiveEnrollment } from '@/lib/supabase/session';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { CourseTabs } from '@/app/area/course-tabs';
 import { MaterialDownload } from '@/app/area/material-download';
+import { LessonDescription } from '@/app/area/lesson-description';
 import './evs.css';
 import { AssistenteEvs } from './assistente-evs';
 
@@ -217,7 +218,7 @@ export default async function EvsCoursePage({ searchParams }: { searchParams?: {
             initiallyOpen={commentsOpen}
             informationHref={lessonHref}
             commentsHref={`${lessonHref}&tab=comentarios`}
-            information={<p className="ep-desc">{currentLesson.description}</p>}
+            information={<LessonDescription text={currentLesson.description} />}
             comments={<section className="ep-comments">
             <div className="ep-comment-list">
               {rootComments.length ? rootComments.map((comment: any) => <article className="ep-comment" key={comment.id}>
