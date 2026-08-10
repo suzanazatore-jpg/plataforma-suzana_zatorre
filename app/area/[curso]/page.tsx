@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getCurrentStudent } from '@/lib/supabase/session';
 import { CourseTabs } from '@/app/area/course-tabs';
 import { MaterialDownload } from '@/app/area/material-download';
+import { LessonDescription } from '@/app/area/lesson-description';
 import '@/app/area/evs/evs.css';
 
 export const dynamic = 'force-dynamic';
@@ -214,7 +215,7 @@ export default async function CoursePage({
           <div className="ep-video">
             {current.video_url ? <iframe src={current.video_url} title={current.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <button type="button" className="ep-play" aria-label="Aula sem vídeo"><Play size={28} fill="currentColor" /></button>}
           </div>
-          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<p className="ep-desc">{current.description || course.description || course.subtitle || 'Curso sem descrição.'}</p>} comments={<section className="ep-comments">
+          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<LessonDescription text={current.description || course.description || course.subtitle || 'Curso sem descrição.'} />} comments={<section className="ep-comments">
             <div className="ep-comment-list">
               {rootComments.length ? rootComments.map((comment: any) => <article className="ep-comment" key={comment.id}>
                 <strong>{comment.author}</strong>
