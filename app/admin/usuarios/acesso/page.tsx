@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { sendAccessEmail } from '@/lib/email/access-email';
 import AccessManager, { type CursoAcesso } from './access-manager';
 import './acesso.css';
 
@@ -186,48 +187,17 @@ async function reenviarAcesso(alunaId: string): Promise<Resultado> {
     .maybeSingle();
   if (!aluna?.email) return { ok: false, mensagem: 'Aluna não encontrada.' };
 
-  const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
-  if (!pabblyUrl) return { ok: false, mensagem: 'O envio de e-mail não está configurado (Pabbly).' };
-
   const senhaProvisoria = gerarSenhaProvisoria();
   const { error: senhaErro } = await supabase.auth.admin.updateUserById(alunaId, { password: senhaProvisoria });
   if (senhaErro) return { ok: false, mensagem: 'Não foi possível gerar uma nova senha. Tente novamente.' };
 
-  const { data: recovery, error: recoveryError } = await supabase.auth.admin.generateLink({
-    type: 'recovery',
+  const envio = await sendAccessEmail({
     email: aluna.email,
-    options: { redirectTo: `${academyUrl()}/recuperar-senha` }
+    name: aluna.name || null,
+    tempPassword: senhaProvisoria,
+    courseName: null
   });
-  if (recoveryError || !recovery?.properties?.action_link) {
-    return { ok: false, mensagem: 'A senha foi trocada, mas o link de acesso não pôde ser gerado.' };
-  }
-
-  try {
-    const resposta = await fetch(pabblyUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        event: 'academy_access_created',
-        transaction_id: `resend-${crypto.randomUUID()}`,
-        first_name: primeiroNome(aluna.name || 'Aluna'),
-        full_name: aluna.name || 'Aluna',
-        email: aluna.email,
-        phone: aluna.phone || null,
-        product_id: null,
-        product_name: 'Reenvio de acesso',
-        course_slug: null,
-        course_name: null,
-        academy_url: `${academyUrl()}/login`,
-        is_new_user: false,
-        temporary_password: senhaProvisoria,
-        password_setup_url: recovery.properties.action_link
-      }),
-      cache: 'no-store'
-    });
-    if (!resposta.ok) return { ok: false, mensagem: 'A senha foi trocada, mas o e-mail não pôde ser enviado.' };
-  } catch {
-    return { ok: false, mensagem: 'A senha foi trocada, mas o e-mail não pôde ser enviado.' };
-  }
+  if (!envio.ok) return { ok: false, mensagem: 'A senha foi trocada, mas o e-mail não pôde ser enviado.' };
 
   return { ok: true, mensagem: 'E-mail reenviado com uma nova senha provisória.' };
 }
