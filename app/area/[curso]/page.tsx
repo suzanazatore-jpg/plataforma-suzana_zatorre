@@ -61,6 +61,7 @@ async function toggleLessonProgress(formData: FormData) {
     .eq('profile_id', auth.user.id)
     .eq('course_id', lesson.course_id)
     .eq('status', 'active')
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
   if (!enrollment) {
     const { data: profile } = await supabase
@@ -119,6 +120,7 @@ export default async function CoursePage({
       .eq('profile_id', student.userId)
       .eq('course_id', course.id)
       .eq('status', 'active')
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .maybeSingle();
     if (!enrollment) redirect('/acesso-negado');
   }
