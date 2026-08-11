@@ -14,6 +14,7 @@ import { supportUrl } from '@/lib/course';
 import { getEnrolledCourses, getPublishedCourses, getPublishedCourseShelves } from '@/lib/supabase/data';
 import { getCurrentStudent } from '@/lib/supabase/session';
 import { CarrosselMais } from './carrossel-mais';
+import { logoutStudent } from '@/app/actions/auth';
 import './area-home.css';
 
 export const dynamic = 'force-dynamic';
@@ -154,6 +155,9 @@ export default async function MemberAreaPage() {
         <a href="#cursos"><PlayCircle size={20} /><span>Extras</span></a>
         <a href={supportUrl} target="_blank" rel="noopener noreferrer"><Headphones size={20} /><span>Suporte</span></a>
         {isAdmin ? (<Link href="/admin"><ShieldCheck size={20} /><span>Admin</span></Link>) : null}
+        <form action={logoutStudent} className="mh-tab-logout">
+          <button type="submit"><LogOut size={20} /><span>Sair</span></button>
+        </form>
       </nav>
     </div>
   );
