@@ -21,8 +21,9 @@ type EditarUsuario = (dados: {
   email: string;
 }) => Promise<Resultado>;
 type ApagarUsuario = (dados: { id: string; emailConfirmacao: string }) => Promise<Resultado>;
-type AlunaImportada = { nome: string; email: string; telefone?: string };
-type ImportarUsuarios = (dados: AlunaImportada[], opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[] }) => Promise<Resultado>;
+type AlunaImportada = { nome: string; email: string; telefone?: string; dataExpiracao?: string; dataCompra?: string };
+type PlanoOpcao = { id: string; name: string };
+type ImportarUsuarios = (dados: AlunaImportada[], opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[]; planoIds?: string[] }) => Promise<Resultado>;
 
 function mostrarResultado(resultado: Resultado) {
   window.alert(resultado.mensagem);
@@ -41,6 +42,8 @@ function lerCsv(conteudo: string): AlunaImportada[] {
   const indiceNome = cabecalhos.findIndex((item) => ['nome', 'name', 'nome completo'].includes(item));
   const indiceEmail = cabecalhos.findIndex((item) => ['email', 'e-mail'].includes(item));
   const indiceTelefone = cabecalhos.findIndex((item) => ['telefone', 'phone', 'whatsapp', 'celular'].includes(item));
+  const indiceExpira = cabecalhos.findIndex((item) => ['data de expiracao', 'expiracao', 'validade', 'data de validade', 'acesso ate', 'expira em'].includes(item));
+  const indiceCompra = cabecalhos.findIndex((item) => ['data da compra', 'data de compra', 'compra', 'comprado em'].includes(item));
   if (indiceNome < 0 || indiceEmail < 0) return [];
 
   return linhas.slice(1).map((linha) => {
@@ -48,12 +51,14 @@ function lerCsv(conteudo: string): AlunaImportada[] {
     return {
       nome: colunas[indiceNome] || '',
       email: colunas[indiceEmail] || '',
-      telefone: indiceTelefone >= 0 ? colunas[indiceTelefone] || '' : ''
+      telefone: indiceTelefone >= 0 ? colunas[indiceTelefone] || '' : '',
+      dataExpiracao: indiceExpira >= 0 ? colunas[indiceExpira] || '' : '',
+      dataCompra: indiceCompra >= 0 ? colunas[indiceCompra] || '' : ''
     };
   }).filter((item) => item.nome || item.email);
 }
 
-export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { importarUsuarios: ImportarUsuarios; cursos?: CursoOpcao[] }) {
+export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [] }: { importarUsuarios: ImportarUsuarios; cursos?: CursoOpcao[]; planos?: PlanoOpcao[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [aberto, setAberto] = useState(false);
@@ -63,9 +68,12 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { import
   const [erro, setErro] = useState('');
   const [enviarBoasVindas, setEnviarBoasVindas] = useState(false);
   const [cursoIds, setCursoIds] = useState<string[]>([]);
+  const [planoIds, setPlanoIds] = useState<string[]>([]);
 
   const alternarCurso = (id: string) =>
     setCursoIds((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
+  const alternarPlano = (id: string) =>
+    setPlanoIds((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
 
   function fechar() {
     if (processando) return;
@@ -75,6 +83,7 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { import
     setErro('');
     setEnviarBoasVindas(false);
     setCursoIds([]);
+    setPlanoIds([]);
   }
 
   async function carregarArquivo(arquivo?: File) {
@@ -104,7 +113,7 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { import
     setProcessando(true);
     setErro('');
     try {
-      const resultado = await importarUsuarios(alunas, { enviarBoasVindas, cursoIds });
+      const resultado = await importarUsuarios(alunas, { enviarBoasVindas, cursoIds, planoIds });
       if (!resultado.ok) {
         setErro(resultado.mensagem);
         return;
@@ -149,7 +158,7 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { import
                   : <><b>Modo silencioso:</b> cria as contas sem enviar e-mail, WhatsApp nem senha.{cursoIds.length ? ' Os cursos escolhidos já ficam liberados.' : ' Você libera os cursos depois, na mão.'}</>}</p>
               </div>
 
-              <p className="import-help">A planilha precisa ter as colunas <code>Nome</code>, <code>Email</code> e <code>Telefone</code> — uma aluna por linha. No Excel, salve como <code>CSV</code>.</p>
+              <p className="import-help">A planilha precisa ter <code>Nome</code>, <code>Email</code> e <code>Telefone</code> — uma aluna por linha. Opcional: <code>Data de expiração</code> e <code>Data da compra</code> (DD/MM/AAAA), pra cada aluna manter a validade dela. No Excel, salve como <code>CSV</code>.</p>
 
               <div
                 className="import-drop"
@@ -175,6 +184,24 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [] }: { import
               )}
 
               <div className="iu-opts">
+                {planos.length > 0 && (
+                  <div className="iu-block">
+                    <div className="iu-lbl">Liberar por plano <small>(opcional — libera os cursos do plano e usa a validade dele)</small></div>
+                    <div className="iu-chips">
+                      {planos.map((plano) => (
+                        <button
+                          key={plano.id}
+                          type="button"
+                          className={`iu-chip${planoIds.includes(plano.id) ? ' on' : ''}`}
+                          onClick={() => alternarPlano(plano.id)}
+                        >
+                          {planoIds.includes(plano.id) ? '✓ ' : ''}{plano.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {cursos.length > 0 && (
                   <div className="iu-block">
                     <div className="iu-lbl">Liberar acesso aos cursos <small>(opcional — vale para todas)</small></div>
