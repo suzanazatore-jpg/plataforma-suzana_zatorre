@@ -71,6 +71,7 @@ async function toggleLessonProgress(formData: FormData) {
     .eq('profile_id', auth.user.id)
     .eq('course_id', lesson.course_id)
     .eq('status', 'active')
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
   if (!enrollment) return;
 
