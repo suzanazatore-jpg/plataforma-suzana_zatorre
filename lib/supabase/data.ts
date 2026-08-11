@@ -50,7 +50,8 @@ export async function getEnrolledCourses() {
     .from('enrollments')
     .select('course_id')
     .eq('profile_id', user.id)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
   const courseIds = (enrollments || []).map((e) => e.course_id);
   if (!courseIds.length) return [];
