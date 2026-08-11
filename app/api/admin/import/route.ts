@@ -183,7 +183,7 @@ function buildRows(text: string): { rows: ValidatedRow[]; fatal: string | null }
 
 function buildEmailHtml(params: { name: string | null; email: string; tempPassword: string; courseName: string }) {
   const firstName = params.name?.trim().split(/\s+/)[0] || 'Aluna';
-  const loginLink = `${LOGIN_URL}/login`;
+  const loginLink = `${LOGIN_URL}/`;
   return `<!DOCTYPE html><html lang="pt-BR"><body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <div style="max-width:520px;margin:0 auto;padding:24px;">
     <div style="background:#111114;border-radius:14px;padding:30px 24px;text-align:center;">
