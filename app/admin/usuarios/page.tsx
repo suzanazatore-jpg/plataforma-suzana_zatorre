@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Resultado = { ok: boolean; mensagem: string };
 type CursoOpcao = { id: string; title: string; slug: string };
-type AlunaImportada = { nome: string; email: string; telefone?: string };
+type AlunaImportada = { nome: string; email: string; telefone?: string; dataExpiracao?: string; dataCompra?: string };
+type PlanoOpcao = { id: string; name: string };
 
 async function validarAdministradora() {
   const clienteSessao = createSupabaseServerClient();
@@ -41,6 +42,25 @@ function primeiroNome(nome: string) {
 function gerarSenhaProvisoria() {
   const randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
   return String(100000 + (randomValue % 900000));
+}
+
+// Converte "DD/MM/AAAA" (ou "DD/MM/AAAA HH:MM") em ISO. fimDoDia=true usa 23:59:59 (bom pra validade).
+function parseDataBR(valor?: string, fimDoDia = false): string | null {
+  const s = String(valor || '').trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const dia = Number(m[1]);
+    const mes = Number(m[2]) - 1;
+    const ano = Number(m[3]);
+    const hora = m[4] != null ? Number(m[4]) : (fimDoDia ? 23 : 0);
+    const min = m[5] != null ? Number(m[5]) : (fimDoDia ? 59 : 0);
+    const seg = m[6] != null ? Number(m[6]) : (fimDoDia ? 59 : 0);
+    const dt = new Date(Date.UTC(ano, mes, dia, hora, min, seg));
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  const iso = new Date(s);
+  return Number.isNaN(iso.getTime()) ? null : iso.toISOString();
 }
 
 // Converte o atalho de tempo (30d/3m/6m/12m) ou uma data exata (YYYY-MM-DD)
@@ -266,7 +286,7 @@ async function apagarUsuario(dados: { id: string; emailConfirmacao: string }): P
 
 async function importarUsuarios(
   dados: AlunaImportada[],
-  opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[] }
+  opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[]; planoIds?: string[] }
 ): Promise<Resultado> {
   'use server';
   const supabase = await validarAdministradora();
@@ -299,11 +319,36 @@ async function importarUsuarios(
     cursosSelecionados = cursosData;
   }
 
+  // Planos a liberar — trazem os cursos vinculados e a periodicidade (validade padrão).
+  const planoIds = Array.from(new Set((opcoes?.planoIds || []).map((id) => String(id).trim()).filter(Boolean)));
+  let periodoPadraoDias = 0;
+  const cursosDosPlanos: CursoOpcao[] = [];
+  if (planoIds.length) {
+    if (planoIds.some((id) => !UUID.test(id))) return { ok: false, mensagem: 'Um dos planos selecionados é inválido.' };
+    const { data: planosData, error: planosErro } = await supabase
+      .from('plans')
+      .select('id, period_days, plan_courses(courses(id, title, slug))')
+      .in('id', planoIds);
+    if (planosErro) return { ok: false, mensagem: 'Não foi possível confirmar os planos selecionados. Tente de novo.' };
+    for (const plano of (planosData || []) as any[]) {
+      if (plano.period_days && plano.period_days > periodoPadraoDias) periodoPadraoDias = plano.period_days;
+      for (const pc of (plano.plan_courses || [])) {
+        const curso = pc.courses;
+        if (curso?.id) cursosDosPlanos.push({ id: curso.id, title: curso.title, slug: curso.slug });
+      }
+    }
+  }
+
+  // Une cursos avulsos + cursos dos planos, sem repetir.
+  const mapaCursos = new Map<string, CursoOpcao>();
+  for (const curso of [...cursosSelecionados, ...cursosDosPlanos]) mapaCursos.set(curso.id, curso);
+  const cursosFinais = Array.from(mapaCursos.values());
+
   const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
   if (enviarBoasVindas && !pabblyUrl) {
     return { ok: false, mensagem: 'O envio de e-mail não está configurado (Pabbly). Desligue o envio de e-mail ou configure antes de importar.' };
   }
-  const cursoPrincipal = cursosSelecionados[0] || null;
+  const cursoPrincipal = cursosFinais[0] || null;
 
   const unicas = new Map<string, AlunaImportada>();
   let invalidas = 0;
@@ -315,7 +360,7 @@ async function importarUsuarios(
       invalidas++;
       continue;
     }
-    if (!unicas.has(email)) unicas.set(email, { nome, email, telefone });
+    if (!unicas.has(email)) unicas.set(email, { nome, email, telefone, dataExpiracao: item.dataExpiracao, dataCompra: item.dataCompra });
   }
 
   let criadas = 0;
@@ -366,15 +411,21 @@ async function importarUsuarios(
       continue;
     }
 
-    // Libera os cursos escolhidos (todas as alunas recebem os mesmos).
-    for (const curso of cursosSelecionados) {
+    // Validade e data da compra desta aluna: coluna da planilha > periodicidade do plano > sem validade.
+    const expira = parseDataBR(aluna.dataExpiracao, true)
+      || (periodoPadraoDias > 0 ? new Date(Date.now() + periodoPadraoDias * 86400000).toISOString() : null);
+    const comprou = parseDataBR(aluna.dataCompra, false) || new Date().toISOString();
+
+    // Libera os cursos (avulsos + os que vêm dos planos).
+    for (const curso of cursosFinais) {
       await supabase.from('enrollments').upsert(
         {
           profile_id: authData.user.id,
           course_id: curso.id,
           status: 'active',
           source: 'csv_import',
-          purchased_at: new Date().toISOString()
+          purchased_at: comprou,
+          ...(expira ? { expires_at: expira } : {})
         },
         { onConflict: 'profile_id,course_id' }
       );
@@ -461,6 +512,7 @@ export default async function UsuariosPage() {
   const supabase = createSupabaseAdminClient();
   let alunas: any[] = [];
   let cursos: CursoOpcao[] = [];
+  let planos: PlanoOpcao[] = [];
   let erroConexao = false;
 
   if (!supabase) erroConexao = true;
@@ -474,6 +526,8 @@ export default async function UsuariosPage() {
     if (profilesError || enrollmentsError || authError || coursesError) erroConexao = true;
     else {
       cursos = courses || [];
+      const { data: plansData } = await supabase.from('plans').select('id, name').order('name', { ascending: true });
+      planos = plansData || [];
       alunas = (profiles || []).map((profile) => {
         const matriculas = (enrollments || []).filter((item) => item.profile_id === profile.id);
         const usuarioAuth = authData?.users?.find((usuario) => usuario.id === profile.id);
@@ -499,7 +553,7 @@ export default async function UsuariosPage() {
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
       <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
-      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} cursos={cursos} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
+      <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} cursos={cursos} planos={planos} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
         {alunas.length === 0 ? <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center' }}>Nenhuma aluna cadastrada.</td></tr> : alunas.map((a) => <tr key={a.id}>
