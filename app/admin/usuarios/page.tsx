@@ -3,6 +3,7 @@ import { Users, MessageSquare } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { sendAccessEmail } from '@/lib/email/access-email';
 import { AcoesUsuario, ListaUsuariosButtons, NovoUsuarioButton } from './user-actions';
 import './usuarios.css';
 
@@ -172,44 +173,13 @@ async function criarUsuario(dados: {
 
   let aviso = '';
   if (dados.enviarBoasVindas && senhaProvisoria) {
-    const { data: recovery, error: recoveryError } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
+    const envio = await sendAccessEmail({
       email,
-      options: { redirectTo: `${academyUrl()}/recuperar-senha` }
+      name: nome,
+      tempPassword: senhaProvisoria,
+      courseName: curso?.title || null
     });
-    const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
-
-    if (recoveryError || !recovery?.properties?.action_link || !pabblyUrl) {
-      aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
-    } else {
-      try {
-        const idManual = `admin-${crypto.randomUUID()}`;
-        const pabblyResponse = await fetch(pabblyUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            event: 'academy_access_created',
-            transaction_id: idManual,
-            first_name: primeiroNome(nome),
-            full_name: nome,
-            email,
-            phone: telefone || null,
-            product_id: curso?.id || null,
-            product_name: curso?.title || 'Cadastro manual sem curso',
-            course_slug: curso?.slug || null,
-            course_name: curso?.title || null,
-            academy_url: `${academyUrl()}/login`,
-            is_new_user: true,
-            temporary_password: senhaProvisoria,
-            password_setup_url: recovery.properties.action_link
-          }),
-          cache: 'no-store'
-        });
-        if (!pabblyResponse.ok) aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
-      } catch {
-        aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
-      }
-    }
+    if (!envio.ok) aviso = ' A conta foi criada, mas o e-mail de boas-vindas não pôde ser enviado.';
   }
 
   revalidatePath('/admin/usuarios');
@@ -344,9 +314,8 @@ async function importarUsuarios(
   for (const curso of [...cursosSelecionados, ...cursosDosPlanos]) mapaCursos.set(curso.id, curso);
   const cursosFinais = Array.from(mapaCursos.values());
 
-  const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
-  if (enviarBoasVindas && !pabblyUrl) {
-    return { ok: false, mensagem: 'O envio de e-mail não está configurado (Pabbly). Desligue o envio de e-mail ou configure antes de importar.' };
+  if (enviarBoasVindas && !process.env.BREVO_API_KEY?.trim()) {
+    return { ok: false, mensagem: 'O envio de e-mail não está configurado (Brevo). Desligue o envio de e-mail ou configure a BREVO_API_KEY antes de importar.' };
   }
   const cursoPrincipal = cursosFinais[0] || null;
 
@@ -431,43 +400,15 @@ async function importarUsuarios(
       );
     }
 
-    // E-mail de boas-vindas com a senha — mesmo fluxo do Pabbly usado no cadastro individual.
-    if (enviarBoasVindas && senhaProvisoria && pabblyUrl) {
-      try {
-        const { data: recovery } = await supabase.auth.admin.generateLink({
-          type: 'recovery',
-          email: aluna.email,
-          options: { redirectTo: `${academyUrl()}/recuperar-senha` }
-        });
-        if (!recovery?.properties?.action_link) {
-          emailsFalharam++;
-        } else {
-          const pabblyResponse = await fetch(pabblyUrl, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              event: 'academy_access_created',
-              transaction_id: `csv-${crypto.randomUUID()}`,
-              first_name: primeiroNome(aluna.nome),
-              full_name: aluna.nome,
-              email: aluna.email,
-              phone: aluna.telefone || null,
-              product_id: cursoPrincipal?.id || null,
-              product_name: cursoPrincipal?.title || 'Importação em massa',
-              course_slug: cursoPrincipal?.slug || null,
-              course_name: cursoPrincipal?.title || null,
-              academy_url: `${academyUrl()}/login`,
-              is_new_user: true,
-              temporary_password: senhaProvisoria,
-              password_setup_url: recovery.properties.action_link
-            }),
-            cache: 'no-store'
-          });
-          if (!pabblyResponse.ok) emailsFalharam++;
-        }
-      } catch {
-        emailsFalharam++;
-      }
+    // E-mail de boas-vindas com a senha, via Brevo (mesmo modelo do cadastro individual).
+    if (enviarBoasVindas && senhaProvisoria) {
+      const envio = await sendAccessEmail({
+        email: aluna.email,
+        name: aluna.nome,
+        tempPassword: senhaProvisoria,
+        courseName: cursoPrincipal?.title || null
+      });
+      if (!envio.ok) emailsFalharam++;
     }
 
     criadas++;
