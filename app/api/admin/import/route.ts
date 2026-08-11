@@ -184,27 +184,27 @@ function buildRows(text: string): { rows: ValidatedRow[]; fatal: string | null }
 function buildEmailHtml(params: { name: string | null; email: string; tempPassword: string; courseName: string }) {
   const firstName = params.name?.trim().split(/\s+/)[0] || 'Aluna';
   const loginLink = `${LOGIN_URL}/login`;
-  return `<!DOCTYPE html><html lang="pt-BR"><body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+  return `<!DOCTYPE html><html lang="pt-BR"><body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <div style="max-width:520px;margin:0 auto;padding:24px;">
-    <div style="background:#111114;border-radius:14px;padding:28px 24px;text-align:center;">
-      <div style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:.5px;">ACADEMIA DE VENDAS</div>
-      <div style="color:#ff2e63;font-size:13px;margin-top:4px;">Suzana Zatorre</div>
+    <div style="background:#111114;border-radius:14px;padding:30px 24px;text-align:center;">
+      <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:.5px;line-height:1.2;">ACADEMIA <span style="color:#ff2e63;">DE VENDAS</span></div>
+      <div style="color:#a1a1aa;font-size:12px;margin-top:6px;letter-spacing:2px;">SUZANA ZATORRE</div>
     </div>
-    <div style="background:#ffffff;border-radius:14px;padding:28px 24px;margin-top:12px;">
-      <p style="font-size:16px;margin:0 0 14px;">Olá, ${firstName}! 🎉</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Seu acesso ao curso <strong>${params.courseName}</strong> está liberado. Use os dados abaixo para entrar:</p>
-      <div style="background:#f4f4f5;border-radius:10px;padding:16px;margin:0 0 20px;">
-        <p style="font-size:14px;margin:0 0 8px;"><strong>Login:</strong> ${params.email}</p>
-        <p style="font-size:14px;margin:0;"><strong>Senha provisória:</strong> <span style="font-size:20px;letter-spacing:2px;color:#ff2e63;font-weight:bold;">${params.tempPassword}</span></p>
+    <div style="background:#ffffff;border-radius:14px;padding:30px 26px;margin-top:12px;">
+      <p style="font-size:19px;font-weight:bold;margin:0 0 14px;">Seu acesso está liberado! 🎉</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Olá, <strong>${firstName}</strong>! Que alegria ter você aqui. Seu acesso ao <strong>${params.courseName}</strong> já está liberado. Use os dados abaixo para entrar:</p>
+      <div style="background:#f4f4f5;border-radius:12px;padding:18px 20px;margin:0 0 22px;">
+        <p style="font-size:14px;margin:0 0 10px;color:#374151;"><strong>Login (seu e-mail):</strong><br>${params.email}</p>
+        <p style="font-size:14px;margin:0;color:#374151;"><strong>Sua senha de acesso:</strong><br><span style="display:inline-block;margin-top:6px;font-size:26px;letter-spacing:4px;color:#ff2e63;font-weight:bold;">${params.tempPassword}</span></p>
       </div>
-      <div style="text-align:center;margin:0 0 20px;">
-        <a href="${loginLink}" style="background:#ff2e63;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:10px;display:inline-block;">Acessar a plataforma</a>
+      <div style="text-align:center;margin:0 0 22px;">
+        <a href="${loginLink}" style="background:#ff2e63;color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;padding:15px 34px;border-radius:10px;display:inline-block;">Acessar a plataforma</a>
       </div>
-      <p style="font-size:13px;line-height:1.6;color:#6b7280;margin:0;">No primeiro acesso, recomendamos trocar a senha provisória por uma de sua preferência. Qualquer dúvida, é só responder este e-mail.</p>
+      <p style="font-size:13px;line-height:1.6;color:#6b7280;margin:0;border-top:1px solid #eee;padding-top:16px;">Dica: no primeiro acesso, você pode trocar essa senha por uma de sua preferência, lá dentro da plataforma. Qualquer dúvida, é só responder este e-mail que a gente te ajuda. 💗</p>
     </div>
-    <p style="text-align:center;font-size:12px;color:#9ca3af;margin:16px 0 0;">Academia de Vendas · Suzana Zatorre</p>
+    <p style="text-align:center;font-size:12px;color:#9ca3af;margin:18px 0 0;">Academia de Vendas · Suzana Zatorre</p>
   </div>
-</body></html>`;
+</body></html>`
 }
 
 async function sendAccessEmail(params: { email: string; name: string | null; tempPassword: string; courseName: string }) {
@@ -222,7 +222,7 @@ async function sendAccessEmail(params: { email: string; name: string | null; tem
       body: JSON.stringify({
         sender: SENDER,
         to: [{ email: params.email, name: params.name || undefined }],
-        subject: 'Seu acesso à Academia de Vendas',
+        subject: 'Seu acesso à Academia de Vendas está liberado 🎉',
         htmlContent: buildEmailHtml(params)
       })
     });
