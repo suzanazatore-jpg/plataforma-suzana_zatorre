@@ -509,3 +509,30 @@
   /* espaço pra barra não cobrir o conteúdo */
   .member-home .mh-main { padding-bottom: 84px; }
 }
+
+@media (max-width: 640px) {
+  .member-home .mh-tabbar .mh-tab-logout {
+    flex: 1;
+    display: flex;
+    margin: 0;
+  }
+  .member-home .mh-tabbar .mh-tab-logout button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 9px 4px;
+    min-height: 58px;
+    background: transparent;
+    border: 0;
+    color: var(--hg-muted2);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+  }
+  .member-home .mh-tabbar .mh-tab-logout button:active { background: rgba(255, 46, 99, 0.08); }
+}
