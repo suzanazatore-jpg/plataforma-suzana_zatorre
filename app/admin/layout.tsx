@@ -1,11 +1,26 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Home, User, Settings, Search, Bell } from 'lucide-react';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import './admin.css';
 
-// MODO DE CONSTRUÇÃO: Admin aberto, sem login e sem Supabase.
+export const dynamic = 'force-dynamic';
+
 // Este layout (menu lateral + barra de topo) vale para todas as páginas do Admin.
-// Quando a plataforma estiver pronta, entra a checagem de admin de verdade.
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+// PROTEÇÃO: só administradora logada e ativa acessa o painel; senão, redireciona.
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const sessao = createSupabaseServerClient();
+  if (!sessao) redirect('/?erro=login');
+  const { data: auth } = await sessao.auth.getUser();
+  if (!auth?.user) redirect('/?erro=login');
+
+  const db = createSupabaseAdminClient();
+  const { data: perfil } = db
+    ? await db.from('profiles').select('role,status').eq('id', auth.user.id).maybeSingle()
+    : { data: null };
+  if (!perfil || perfil.role !== 'admin' || perfil.status !== 'active') redirect('/acesso-negado');
+
   return (
     <div className="admin-shell">
       <div className="app">
