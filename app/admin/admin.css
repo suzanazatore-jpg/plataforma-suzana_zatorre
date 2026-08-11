@@ -282,3 +282,29 @@
     display: none;
   }
 }
+
+.admin-shell .topbar .to-area {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 46, 99, 0.12);
+  color: var(--hot);
+  border: 1px solid rgba(255, 46, 99, 0.35);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-shell .topbar .to-area:hover {
+  background: rgba(255, 46, 99, 0.2);
+  color: var(--hot);
+}
+
+@media (max-width: 720px) {
+  .admin-shell .topbar { padding: 10px 16px; gap: 10px; }
+  .admin-shell .topbar .search { display: none; }
+  .admin-shell .topbar .right { gap: 12px; }
+  .admin-shell .topbar .usr { font-size: 13px; }
+}
