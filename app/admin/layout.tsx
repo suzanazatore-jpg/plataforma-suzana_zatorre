@@ -51,6 +51,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Search size={15} /> Pesquisar cursos e aulas...
             </div>
             <div className="right">
+              <Link className="to-area" href="/area">
+                <Home size={16} /> Área de aulas
+              </Link>
               <Bell size={19} />
               <span className="usr">Suzana ▾</span>
             </div>
