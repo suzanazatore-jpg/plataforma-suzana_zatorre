@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic';
 type GuruPayload = Record<string, unknown>;
 
 const APPROVED_STATUSES = new Set(['approved', 'paid', 'payment_approved', 'completed', 'active']);
+// Status que REVOGAM o acesso (reembolso efetivado, chargeback, cancelamento, disputa).
+// "Reembolso solicitado" (refund requested) NAO entra aqui de proposito.
+const REVOKE_STATUSES = new Set(['refunded', 'chargeback', 'canceled', 'cancelled', 'dispute', 'in_dispute']);
 
 function readPath(payload: GuruPayload, paths: string[]) {
   for (const path of paths) {
@@ -167,13 +170,16 @@ export async function POST(request: Request) {
 
   if (!eventId) return NextResponse.json({ ok: false, error: 'Guru transaction id was not found.' }, { status: 400 });
 
-  const { data: previousEvent } = await supabase
+  let dedupQuery = supabase
     .from('webhook_events')
     .select('id')
     .eq('source', 'guru')
     .eq('external_id', eventId)
-    .eq('processed', true)
-    .maybeSingle();
+    .eq('processed', true);
+  // Deduplica por (id da transacao + status): o 'approved' e o 'refunded' da mesma
+  // venda sao eventos distintos, mas um mesmo status repetido continua barrado.
+  if (status) dedupQuery = dedupQuery.eq('event_type', status);
+  const { data: previousEvent } = await dedupQuery.maybeSingle();
 
   if (previousEvent) {
     return NextResponse.json({ ok: true, duplicate: true, transaction_id: eventId });
@@ -191,6 +197,67 @@ export async function POST(request: Request) {
     })
     .select('id')
     .single();
+
+  // Reembolso / chargeback / cancelamento / disputa -> revoga o acesso e encerra.
+  // Nao cria usuaria nem dispara Pabbly.
+  if (status && REVOKE_STATUSES.has(status)) {
+    const revokedAt = new Date().toISOString();
+    let refundProfileId: string | null = null;
+    if (email) {
+      const { data: refundProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      refundProfileId = refundProfile?.id || null;
+    }
+
+    let revokedCount = 0;
+
+    // Caminho 1: revoga pelas matriculas com este id de transacao (external_order_id).
+    const { data: revokedByOrder } = await supabase
+      .from('enrollments')
+      .update({ status: 'revoked', updated_at: revokedAt })
+      .eq('external_order_id', eventId)
+      .eq('status', 'active')
+      .select('id');
+    revokedCount += (revokedByOrder || []).length;
+
+    // Caminho 2 (rede de seguranca): por e-mail + cursos do plano da oferta reembolsada.
+    if (!revokedCount && refundProfileId && offerCandidates.length) {
+      const { data: plan } = await supabase
+        .from('plans')
+        .select('id')
+        .in('offer_id', offerCandidates)
+        .maybeSingle();
+      if (plan) {
+        const { data: planCourseRows } = await supabase
+          .from('plan_courses')
+          .select('course_id')
+          .eq('plan_id', plan.id);
+        const courseIds = (planCourseRows || []).map((row: any) => row.course_id);
+        if (courseIds.length) {
+          const { data: revokedByPlan } = await supabase
+            .from('enrollments')
+            .update({ status: 'revoked', updated_at: revokedAt })
+            .eq('profile_id', refundProfileId)
+            .in('course_id', courseIds)
+            .eq('status', 'active')
+            .select('id');
+          revokedCount += (revokedByPlan || []).length;
+        }
+      }
+    }
+
+    await markEvent(supabase, eventLog?.id, { processed: true, error: null });
+    return NextResponse.json({
+      ok: true,
+      action: 'revoked',
+      status,
+      transaction_id: eventId,
+      revoked: revokedCount
+    });
+  }
 
   if (!status || !APPROVED_STATUSES.has(status)) {
     await markEvent(supabase, eventLog?.id, { processed: true });
