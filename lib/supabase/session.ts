@@ -48,7 +48,9 @@ export async function getCurrentStudent(): Promise<CurrentStudent | null> {
 }
 
 /**
- * Verifica se a aluna logada tem matrícula ATIVA no curso informado (por slug).
+ * Verifica se a aluna logada tem matrícula ATIVA e DENTRO DA VALIDADE
+ * no curso informado (por slug).
+ * Regra: status = 'active' E (expires_at nulo OU expires_at no futuro).
  */
 export async function hasActiveEnrollment(courseSlug: string): Promise<boolean> {
   const supabase = createSupabaseServerClient();
@@ -67,12 +69,14 @@ export async function hasActiveEnrollment(courseSlug: string): Promise<boolean> 
 
   if (!course) return false;
 
+  const nowIso = new Date().toISOString();
   const { data: enrollment } = await supabase
     .from('enrollments')
     .select('id')
     .eq('profile_id', user.id)
     .eq('course_id', course.id)
     .eq('status', 'active')
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
     .maybeSingle();
 
   return Boolean(enrollment);
