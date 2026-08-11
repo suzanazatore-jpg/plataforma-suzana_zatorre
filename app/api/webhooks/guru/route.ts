@@ -61,6 +61,37 @@ function getProduct(payload: GuruPayload) {
   };
 }
 
+function collectOfferCandidates(payload: GuruPayload) {
+  const paths = [
+    'product.id',
+    'product.marketplace_id',
+    'product.internal_id',
+    'product.offer.id',
+    'product.offer_id',
+    'offer.id',
+    'offer.marketplace_id',
+    'offer.internal_id',
+    'items.0.id',
+    'items.0.marketplace_id',
+    'items.0.internal_id',
+    'items.0.offer.id',
+    'items.0.offer_id'
+  ];
+
+  const found = new Set<string>();
+  for (const path of paths) {
+    const value = path.split('.').reduce<unknown>((current, key) => {
+      if (!current || typeof current !== 'object') return undefined;
+      return (current as Record<string, unknown>)[key];
+    }, payload);
+    if ((typeof value === 'string' || typeof value === 'number') && String(value).trim()) {
+      found.add(String(value).trim());
+    }
+  }
+
+  return Array.from(found);
+}
+
 function getCourseSlug(payload: GuruPayload) {
   const product = getProduct(payload);
   const configuredMap = process.env.GURU_PRODUCT_COURSE_MAP?.trim();
@@ -132,6 +163,7 @@ export async function POST(request: Request) {
   const name = getName(payload);
   const phone = getPhone(payload);
   const product = getProduct(payload);
+  const offerCandidates = collectOfferCandidates(payload);
 
   if (!eventId) return NextResponse.json({ ok: false, error: 'Guru transaction id was not found.' }, { status: 400 });
 
@@ -154,7 +186,7 @@ export async function POST(request: Request) {
       source: 'guru',
       event_type: status,
       external_id: eventId,
-      payload: { email, phone, product_id: product.id, product_name: product.name, status },
+      payload: { email, phone, product_id: product.id, product_name: product.name, status, offer_candidates: offerCandidates },
       processed: false
     })
     .select('id')
@@ -170,32 +202,76 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Buyer email was not found.' }, { status: 400 });
   }
 
-  let courseSlug: string | null;
-  try {
-    courseSlug = getCourseSlug(payload);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invalid product mapping.';
-    await markEvent(supabase, eventLog?.id, { error: message });
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  // 1) Tenta achar um PLANO pelo id da oferta do Guru.
+  //    Casa o offer_id contra os vários campos candidatos do payload.
+  let planId: string | null = null;
+  let planName: string | null = null;
+  let planPeriodDays: number | null = null;
+  let targetCourses: { id: string; slug: string; title: string }[] = [];
+
+  if (offerCandidates.length) {
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('id, name, period_days')
+      .in('offer_id', offerCandidates)
+      .maybeSingle();
+
+    if (plan) {
+      const { data: planCourseRows } = await supabase
+        .from('plan_courses')
+        .select('courses(id, slug, title)')
+        .eq('plan_id', plan.id);
+
+      const courses = (planCourseRows || [])
+        .map((row: any) => row.courses)
+        .filter((item: any) => item && item.id) as { id: string; slug: string; title: string }[];
+
+      if (courses.length) {
+        planId = plan.id;
+        planName = plan.name;
+        planPeriodDays = plan.period_days;
+        targetCourses = courses;
+      }
+    }
   }
 
-  if (!courseSlug) {
-    const message = `Guru product is not mapped: ${product.id || product.name}`;
-    await markEvent(supabase, eventLog?.id, { error: message });
-    return NextResponse.json({ ok: false, error: message }, { status: 422 });
+  // 2) Rede de seguranca: sem plano (ou plano sem cursos), usa o mapeamento antigo (1 curso).
+  if (!targetCourses.length) {
+    let courseSlug: string | null;
+    try {
+      courseSlug = getCourseSlug(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid product mapping.';
+      await markEvent(supabase, eventLog?.id, { error: message });
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+
+    if (!courseSlug) {
+      const message = `Guru product is not mapped: ${product.id || product.name}`;
+      await markEvent(supabase, eventLog?.id, { error: message });
+      return NextResponse.json({ ok: false, error: message }, { status: 422 });
+    }
+
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('id, slug, title')
+      .eq('slug', courseSlug)
+      .single();
+
+    if (courseError || !course) {
+      const message = `Course not found: ${courseSlug}`;
+      await markEvent(supabase, eventLog?.id, { error: message });
+      return NextResponse.json({ ok: false, error: message }, { status: 404 });
+    }
+
+    targetCourses = [course];
   }
 
-  const { data: course, error: courseError } = await supabase
-    .from('courses')
-    .select('id, slug, title')
-    .eq('slug', courseSlug)
-    .single();
-
-  if (courseError || !course) {
-    const message = `Course not found: ${courseSlug}`;
-    await markEvent(supabase, eventLog?.id, { error: message });
-    return NextResponse.json({ ok: false, error: message }, { status: 404 });
-  }
+  // Validade: apenas quando veio de um plano (agora + period_days). Sem plano, mantem o default do banco.
+  const expiresAt = planPeriodDays
+    ? new Date(Date.now() + planPeriodDays * 24 * 60 * 60 * 1000).toISOString()
+    : null;
+  const primaryCourse = targetCourses[0];
 
   // A six-digit numeric password is easier to type from email or WhatsApp.
   // Generate it with Web Crypto and keep the first digit non-zero.
@@ -247,17 +323,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: profileError.message }, { status: 500 });
   }
 
-  const { error: enrollmentError } = await supabase.from('enrollments').upsert(
-    {
+  const purchasedAt = new Date().toISOString();
+  const enrollmentRows = targetCourses.map((item) => {
+    const row: Record<string, unknown> = {
       profile_id: profileId,
-      course_id: course.id,
+      course_id: item.id,
       status: 'active',
       source: 'guru',
       external_order_id: eventId,
-      purchased_at: new Date().toISOString()
-    },
-    { onConflict: 'profile_id,course_id' }
-  );
+      purchased_at: purchasedAt
+    };
+    if (expiresAt) row.expires_at = expiresAt;
+    return row;
+  });
+
+  const { error: enrollmentError } = await supabase
+    .from('enrollments')
+    .upsert(enrollmentRows, { onConflict: 'profile_id,course_id' });
 
   if (enrollmentError) {
     await markEvent(supabase, eventLog?.id, { error: enrollmentError.message });
@@ -282,8 +364,13 @@ export async function POST(request: Request) {
       phone,
       product_id: product.id,
       product_name: product.name,
-      course_slug: course.slug,
-      course_name: course.title,
+      plan_id: planId,
+      plan_name: planName,
+      plan_period_days: planPeriodDays,
+      course_slug: primaryCourse.slug,
+      course_name: primaryCourse.title,
+      courses: targetCourses.map((item) => ({ slug: item.slug, name: item.title })),
+      access_expires_at: expiresAt,
       academy_url: `${academyUrl()}/login`,
       is_new_user: isNewUser,
       temporary_password: isNewUser ? temporaryPassword : null,
@@ -303,7 +390,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     transaction_id: eventId,
-    course: course.slug,
+    plan: planName,
+    courses: targetCourses.map((item) => item.slug),
     enrollment: 'active',
     pabbly: 'sent'
   });
