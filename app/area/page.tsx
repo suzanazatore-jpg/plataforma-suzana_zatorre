@@ -78,9 +78,9 @@ export default async function MemberAreaPage() {
             </div>
           </div>
           <div className="mh-account-links">
-            <a href="#" className="mh-account-link">
+            <Link href="/area/conta" className="mh-account-link">
               <Settings size={15} /> Minha Conta
-            </a>
+            </Link>
             <Link href="/" className="mh-account-link mh-logout">
               <LogOut size={15} /> Sair
             </Link>
