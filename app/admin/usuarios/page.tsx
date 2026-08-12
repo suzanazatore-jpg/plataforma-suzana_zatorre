@@ -218,7 +218,7 @@ async function editarUsuario(dados: { id: string; nome: string; email: string })
   return { ok: true, mensagem: 'Dados da aluna atualizados com sucesso.' };
 }
 
-async function apagarUsuario(dados: { id: string; emailConfirmacao: string }): Promise<Resultado> {
+async function apagarUsuario(dados: { id: string; confirmacao: string }): Promise<Resultado> {
   'use server';
   const supabase = await validarAdministradora();
   if (!supabase) return { ok: false, mensagem: 'Somente uma administradora conectada pode apagar alunas.' };
@@ -234,8 +234,8 @@ async function apagarUsuario(dados: { id: string; emailConfirmacao: string }): P
     .maybeSingle();
   if (alvoErro || !alvo) return { ok: false, mensagem: 'Aluna não encontrada.' };
   if (alvo.role === 'admin') return { ok: false, mensagem: 'Contas administrativas não podem ser apagadas por esta tela.' };
-  if ((alvo.email || '').toLowerCase() !== dados.emailConfirmacao.trim().toLowerCase()) {
-    return { ok: false, mensagem: 'O e-mail digitado não confere. A aluna não foi apagada.' };
+  if (dados.confirmacao.trim().toUpperCase() !== 'CANCELAR') {
+    return { ok: false, mensagem: 'Confirmação inválida. Digite CANCELAR para apagar a aluna.' };
   }
 
   const { error } = await supabase.auth.admin.deleteUser(dados.id);
