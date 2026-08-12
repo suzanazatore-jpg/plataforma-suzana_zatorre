@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { sendAccessEmail } from '@/lib/email/access-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -452,6 +453,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 
+  // E-mail de boas-vindas com a senha, via Brevo (o WhatsApp acima segue pelo Pabbly).
+  // So para aluna nova; recompra nao troca a senha nem reenvia.
+  let emailStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
+  if (isNewUser && temporaryPassword) {
+    const envio = await sendAccessEmail({
+      email,
+      name,
+      tempPassword: temporaryPassword,
+      courseName: planName || primaryCourse.title
+    });
+    emailStatus = envio.ok ? 'sent' : 'failed';
+  }
+
   await markEvent(supabase, eventLog?.id, { processed: true, error: null });
 
   return NextResponse.json({
@@ -460,6 +474,7 @@ export async function POST(request: Request) {
     plan: planName,
     courses: targetCourses.map((item) => item.slug),
     enrollment: 'active',
-    pabbly: 'sent'
+    pabbly: 'sent',
+    email: emailStatus
   });
 }
