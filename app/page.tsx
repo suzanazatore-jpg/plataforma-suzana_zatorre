@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -14,6 +14,11 @@ export default function LoginPage() {
   const [mensagem, setMensagem] = useState('');
   const [entrando, setEntrando] = useState(false);
   const [verSenha, setVerSenha] = useState(false);
+
+  useEffect(() => {
+    const emailParam = new URLSearchParams(window.location.search).get('email');
+    if (emailParam) setEmail(emailParam);
+  }, []);
 
   async function entrar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
