@@ -414,47 +414,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: enrollmentError.message }, { status: 500 });
   }
 
-  const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
-  if (!pabblyUrl) {
-    await markEvent(supabase, eventLog?.id, { error: 'PABBLY_ACCESS_WEBHOOK_URL is missing.' });
-    return NextResponse.json({ ok: false, error: 'Pabbly webhook is not configured.' }, { status: 500 });
-  }
+  // O acesso ja foi liberado (matriculas acima). Agora avisamos a aluna.
+  // Nem o e-mail nem o WhatsApp sao fatais: se um falhar, o outro cobre e o acesso continua valendo.
 
-  const pabblyResponse = await fetch(pabblyUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      event: 'academy_access_created',
-      transaction_id: eventId,
-      first_name: firstName(name),
-      full_name: name,
-      email,
-      phone,
-      product_id: product.id,
-      product_name: product.name,
-      plan_id: planId,
-      plan_name: planName,
-      plan_period_days: planPeriodDays,
-      course_slug: primaryCourse.slug,
-      course_name: primaryCourse.title,
-      courses: targetCourses.map((item) => ({ slug: item.slug, name: item.title })),
-      access_expires_at: expiresAt,
-      academy_url: `${academyUrl()}/login`,
-      is_new_user: isNewUser,
-      temporary_password: isNewUser ? temporaryPassword : null,
-      password_setup_url: recovery.properties.action_link
-    }),
-    cache: 'no-store'
-  });
-
-  if (!pabblyResponse.ok) {
-    const message = `Pabbly returned HTTP ${pabblyResponse.status}.`;
-    await markEvent(supabase, eventLog?.id, { error: message });
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
-  }
-
-  // E-mail de boas-vindas com a senha, via Brevo (o WhatsApp acima segue pelo Pabbly).
-  // So para aluna nova; recompra nao troca a senha nem reenvia.
+  // 1) E-mail de acesso via Brevo (rede de seguranca principal). So para aluna nova.
   let emailStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
   if (isNewUser && temporaryPassword) {
     const envio = await sendAccessEmail({
@@ -466,6 +429,43 @@ export async function POST(request: Request) {
     emailStatus = envio.ok ? 'sent' : 'failed';
   }
 
+  // 2) WhatsApp via Pabbly. Nao-fatal.
+  let pabblyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
+  const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
+  if (pabblyUrl) {
+    try {
+      const pabblyResponse = await fetch(pabblyUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          event: 'academy_access_created',
+          transaction_id: eventId,
+          first_name: firstName(name),
+          full_name: name,
+          email,
+          phone,
+          product_id: product.id,
+          product_name: product.name,
+          plan_id: planId,
+          plan_name: planName,
+          plan_period_days: planPeriodDays,
+          course_slug: primaryCourse.slug,
+          course_name: primaryCourse.title,
+          courses: targetCourses.map((item) => ({ slug: item.slug, name: item.title })),
+          access_expires_at: expiresAt,
+          academy_url: `${academyUrl()}/login`,
+          is_new_user: isNewUser,
+          temporary_password: isNewUser ? temporaryPassword : null,
+          password_setup_url: recovery.properties.action_link
+        }),
+        cache: 'no-store'
+      });
+      pabblyStatus = pabblyResponse.ok ? 'sent' : 'failed';
+    } catch {
+      pabblyStatus = 'failed';
+    }
+  }
+
   await markEvent(supabase, eventLog?.id, { processed: true, error: null });
 
   return NextResponse.json({
@@ -474,7 +474,7 @@ export async function POST(request: Request) {
     plan: planName,
     courses: targetCourses.map((item) => item.slug),
     enrollment: 'active',
-    pabbly: 'sent',
+    pabbly: pabblyStatus,
     email: emailStatus
   });
 }
