@@ -20,7 +20,7 @@ type EditarUsuario = (dados: {
   nome: string;
   email: string;
 }) => Promise<Resultado>;
-type ApagarUsuario = (dados: { id: string; emailConfirmacao: string }) => Promise<Resultado>;
+type ApagarUsuario = (dados: { id: string; confirmacao: string }) => Promise<Resultado>;
 type AlunaImportada = { nome: string; email: string; telefone?: string; dataExpiracao?: string; dataCompra?: string };
 type PlanoOpcao = { id: string; name: string };
 type ImportarUsuarios = (dados: AlunaImportada[], opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[]; planoIds?: string[] }) => Promise<Resultado>;
@@ -436,6 +436,9 @@ export function AcoesUsuario({
 }) {
   const router = useRouter();
   const [processando, setProcessando] = useState(false);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [confirmacao, setConfirmacao] = useState('');
+  const [erroModal, setErroModal] = useState('');
 
   async function editar() {
     const novoNome = window.prompt('Nome completo:', nome)?.trim();
@@ -454,22 +457,31 @@ export function AcoesUsuario({
     }
   }
 
-  async function apagar() {
-    const confirmou = window.confirm(
-      `Tem certeza que deseja apagar ${nome}?\n\nO login e os acessos aos cursos serão removidos. Esta ação não pode ser desfeita.`
-    );
-    if (!confirmou) return;
+  function abrirApagar() {
+    setConfirmacao('');
+    setErroModal('');
+    setModalAberto(true);
+  }
 
-    const emailConfirmacao = window.prompt(
-      `Para confirmar, digite o e-mail da aluna:\n${email}`
-    )?.trim().toLowerCase();
-    if (!emailConfirmacao) return;
+  function fecharApagar() {
+    if (processando) return;
+    setModalAberto(false);
+  }
 
+  const podeApagar = confirmacao.trim().toUpperCase() === 'CANCELAR';
+
+  async function confirmarApagar() {
+    if (!podeApagar) return;
     setProcessando(true);
+    setErroModal('');
     try {
-      const resultado = await apagarUsuario({ id, emailConfirmacao });
-      mostrarResultado(resultado);
-      if (resultado.ok) router.refresh();
+      const resultado = await apagarUsuario({ id, confirmacao: confirmacao.trim() });
+      if (resultado.ok) {
+        setModalAberto(false);
+        router.refresh();
+      } else {
+        setErroModal(resultado.mensagem);
+      }
     } finally {
       setProcessando(false);
     }
@@ -480,9 +492,69 @@ export function AcoesUsuario({
       <span className="iconbtn" title="Editar" onClick={processando ? undefined : editar}>
         <Pencil size={14} />
       </span>
-      <span className="iconbtn" title="Remover" onClick={processando ? undefined : apagar}>
+      <span className="iconbtn" title="Remover" onClick={processando ? undefined : abrirApagar}>
         <Trash2 size={14} />
       </span>
+
+      {modalAberto ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={fecharApagar}
+          style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(3,3,5,.86)', display: 'grid', placeItems: 'center', padding: 18, fontFamily: 'Archivo,Arial,sans-serif' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(460px,100%)', background: '#111113', border: '1px solid #2b2b31', borderRadius: 18, boxShadow: '0 28px 90px rgba(0,0,0,.65)', color: '#fff', overflow: 'hidden' }}
+          >
+            <div style={{ padding: '20px 22px', borderBottom: '1px solid #2b2b31', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,46,99,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff2e63' }}>
+                <Trash2 size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>Apagar aluna</div>
+                <div style={{ fontSize: 12.5, color: '#a1a1aa' }}>Esta ação não pode ser desfeita.</div>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 22px' }}>
+              <p style={{ fontSize: 14, lineHeight: 1.6, margin: '0 0 12px', color: '#d4d4d8' }}>
+                Você vai apagar <strong style={{ color: '#fff' }}>{nome}</strong> ({email}). O login e todos os acessos aos cursos serão removidos.
+              </p>
+              <p style={{ fontSize: 13, color: '#a1a1aa', margin: '0 0 8px' }}>
+                Para confirmar, digite <strong style={{ color: '#ff2e63', letterSpacing: 1 }}>CANCELAR</strong> abaixo:
+              </p>
+              <input
+                value={confirmacao}
+                onChange={(e) => { setConfirmacao(e.target.value); setErroModal(''); }}
+                placeholder="CANCELAR"
+                autoFocus
+                style={{ width: '100%', height: 42, background: '#0f0f12', color: '#fff', border: `1px solid ${podeApagar ? '#ff2e63' : '#2b2b31'}`, borderRadius: 10, padding: '0 12px', fontSize: 15, letterSpacing: 1, boxSizing: 'border-box', outline: 'none' }}
+              />
+              {erroModal ? <p style={{ color: '#f87171', fontSize: 12.5, margin: '10px 0 0' }}>{erroModal}</p> : null}
+            </div>
+
+            <div style={{ padding: '16px 22px', borderTop: '1px solid #2b2b31', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={fecharApagar}
+                disabled={processando}
+                style={{ background: 'transparent', color: '#d4d4d8', border: '1px solid #2b2b31', borderRadius: 10, padding: '9px 16px', fontSize: 14, cursor: processando ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarApagar}
+                disabled={!podeApagar || processando}
+                style={{ background: '#ff2e63', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 18px', fontSize: 14, fontWeight: 700, cursor: podeApagar && !processando ? 'pointer' : 'not-allowed', opacity: podeApagar && !processando ? 1 : 0.5, fontFamily: 'inherit' }}
+              >
+                {processando ? 'Apagando…' : 'Apagar aluna'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
