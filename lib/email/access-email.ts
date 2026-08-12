@@ -13,7 +13,7 @@ export function buildAccessEmailHtml(params: {
   courseName?: string | null;
 }) {
   const nome = primeiroNome(params.name);
-  const loginLink = `${LOGIN_URL}/`;
+  const loginLink = `${LOGIN_URL}/?email=${encodeURIComponent(params.email)}`;
   const linhaCurso = params.courseName
     ? `Seu acesso ao <strong>${params.courseName}</strong> já está liberado.`
     : `Seu acesso à Academia de Vendas já está liberado.`;
