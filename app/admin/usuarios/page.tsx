@@ -49,7 +49,7 @@ function gerarSenhaProvisoria() {
 function parseDataBR(valor?: string, fimDoDia = false): string | null {
   const s = String(valor || '').trim();
   if (!s) return null;
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\sT]*[-–—]?[\sT]*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const dia = Number(m[1]);
     const mes = Number(m[2]) - 1;
