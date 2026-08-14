@@ -64,6 +64,9 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [
   const inputRef = useRef<HTMLInputElement>(null);
   const [aberto, setAberto] = useState(false);
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [abaFiltros, setAbaFiltros] = useState<'aluna' | 'produtos'>(() =>
+    searchParams.get('curso') || searchParams.get('plano') || searchParams.get('oferta') ? 'produtos' : 'aluna'
+  );
   const [processando, setProcessando] = useState(false);
   const [arquivoNome, setArquivoNome] = useState('');
   const [alunas, setAlunas] = useState<AlunaImportada[]>([]);
@@ -151,51 +154,60 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [
           <div className="filters-panel" id="student-filters">
             <div className="filters-title"><Filter size={17} /> Filtros de pesquisa</div>
             <form action="/admin/usuarios" method="get">
-              <label>Nome da aluna
-                <input name="nome" defaultValue={searchParams.get('nome') || ''} placeholder="Nome da aluna" />
-              </label>
-              <label>E-mail da aluna
-                <input name="email" type="email" defaultValue={searchParams.get('email') || ''} placeholder="E-mail da aluna" />
-              </label>
-              <label>Código da aluna
-                <input name="codigo" defaultValue={searchParams.get('codigo') || ''} placeholder="Código da aluna" />
-              </label>
-              <label>Data de cadastro
-                <input name="cadastro" type="date" defaultValue={searchParams.get('cadastro') || ''} />
-              </label>
-              <label>Data do último login
-                <input name="ultimoLogin" type="date" defaultValue={searchParams.get('ultimoLogin') || ''} />
-              </label>
-              <label>Status da aluna
-                <select name="status" defaultValue={searchParams.get('status') || ''}>
-                  <option value="">Todas</option>
-                  <option value="ativa">Ativa</option>
-                  <option value="bloqueada">Bloqueada</option>
-                  <option value="expirada">Acesso expirado</option>
-                  <option value="nunca-acessou">Nunca acessou</option>
-                </select>
-              </label>
-              <div className="filters-divider">Produto e acesso</div>
-              <label>Curso
-                <select name="curso" defaultValue={searchParams.get('curso') || ''}>
-                  <option value="">Todos os cursos</option>
-                  {cursos.map((curso) => <option key={curso.id} value={curso.id}>{curso.title}</option>)}
-                </select>
-              </label>
-              <label>Plano
-                <select name="plano" defaultValue={searchParams.get('plano') || ''}>
-                  <option value="">Todos os planos</option>
-                  {planos.map((plano) => <option key={plano.id} value={plano.id}>{plano.name}</option>)}
-                </select>
-              </label>
-              <label>Oferta
-                <select name="oferta" defaultValue={searchParams.get('oferta') || ''}>
-                  <option value="">Todas as ofertas</option>
-                  {planos.filter((plano) => plano.offer_id).map((plano) => (
-                    <option key={plano.id} value={plano.offer_id}>{plano.name} — {plano.offer_id}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="filters-tabs" role="tablist" aria-label="Categorias de filtros">
+                <button className={abaFiltros === 'aluna' ? 'active' : ''} type="button" role="tab" aria-selected={abaFiltros === 'aluna'} onClick={() => setAbaFiltros('aluna')}>Dados da aluna</button>
+                <button className={abaFiltros === 'produtos' ? 'active' : ''} type="button" role="tab" aria-selected={abaFiltros === 'produtos'} onClick={() => setAbaFiltros('produtos')}>Planos e ofertas</button>
+              </div>
+
+              <div className={`filters-group${abaFiltros === 'aluna' ? ' active' : ''}`}>
+                <label>Nome da aluna
+                  <input name="nome" defaultValue={searchParams.get('nome') || ''} placeholder="Nome da aluna" />
+                </label>
+                <label>E-mail da aluna
+                  <input name="email" type="email" defaultValue={searchParams.get('email') || ''} placeholder="E-mail da aluna" />
+                </label>
+                <label>Código da aluna
+                  <input name="codigo" defaultValue={searchParams.get('codigo') || ''} placeholder="Código da aluna" />
+                </label>
+                <label>Data de cadastro
+                  <input name="cadastro" type="date" defaultValue={searchParams.get('cadastro') || ''} />
+                </label>
+                <label>Data do último login
+                  <input name="ultimoLogin" type="date" defaultValue={searchParams.get('ultimoLogin') || ''} />
+                </label>
+                <label>Status da aluna
+                  <select name="status" defaultValue={searchParams.get('status') || ''}>
+                    <option value="">Todas</option>
+                    <option value="ativa">Ativa</option>
+                    <option value="bloqueada">Bloqueada</option>
+                    <option value="expirada">Acesso expirado</option>
+                    <option value="nunca-acessou">Nunca acessou</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className={`filters-group${abaFiltros === 'produtos' ? ' active' : ''}`}>
+                <label>Curso
+                  <select name="curso" defaultValue={searchParams.get('curso') || ''}>
+                    <option value="">Todos os cursos</option>
+                    {cursos.map((curso) => <option key={curso.id} value={curso.id}>{curso.title}</option>)}
+                  </select>
+                </label>
+                <label>Plano
+                  <select name="plano" defaultValue={searchParams.get('plano') || ''}>
+                    <option value="">Todos os planos</option>
+                    {planos.map((plano) => <option key={plano.id} value={plano.id}>{plano.name}</option>)}
+                  </select>
+                </label>
+                <label>Oferta
+                  <select name="oferta" defaultValue={searchParams.get('oferta') || ''}>
+                    <option value="">Todas as ofertas</option>
+                    {planos.filter((plano) => plano.offer_id).map((plano) => (
+                      <option key={plano.id} value={plano.offer_id}>{plano.name} — {plano.offer_id}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <button className="filters-search" type="submit">Pesquisar</button>
               <button
                 className="filters-clear"
