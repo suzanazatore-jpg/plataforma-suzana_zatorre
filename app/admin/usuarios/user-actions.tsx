@@ -22,7 +22,7 @@ type EditarUsuario = (dados: {
 }) => Promise<Resultado>;
 type ApagarUsuario = (dados: { id: string; confirmacao: string }) => Promise<Resultado>;
 type AlunaImportada = { nome: string; email: string; telefone?: string; dataExpiracao?: string; dataCompra?: string };
-type PlanoOpcao = { id: string; name: string };
+type PlanoOpcao = { id: string; name: string; offer_id?: string };
 type ImportarUsuarios = (dados: AlunaImportada[], opcoes?: { enviarBoasVindas?: boolean; cursoIds?: string[]; planoIds?: string[] }) => Promise<Resultado>;
 
 function mostrarResultado(resultado: Resultado) {
@@ -173,6 +173,27 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [
                   <option value="bloqueada">Bloqueada</option>
                   <option value="expirada">Acesso expirado</option>
                   <option value="nunca-acessou">Nunca acessou</option>
+                </select>
+              </label>
+              <div className="filters-divider">Produto e acesso</div>
+              <label>Curso
+                <select name="curso" defaultValue={searchParams.get('curso') || ''}>
+                  <option value="">Todos os cursos</option>
+                  {cursos.map((curso) => <option key={curso.id} value={curso.id}>{curso.title}</option>)}
+                </select>
+              </label>
+              <label>Plano
+                <select name="plano" defaultValue={searchParams.get('plano') || ''}>
+                  <option value="">Todos os planos</option>
+                  {planos.map((plano) => <option key={plano.id} value={plano.id}>{plano.name}</option>)}
+                </select>
+              </label>
+              <label>Oferta
+                <select name="oferta" defaultValue={searchParams.get('oferta') || ''}>
+                  <option value="">Todas as ofertas</option>
+                  {planos.filter((plano) => plano.offer_id).map((plano) => (
+                    <option key={plano.id} value={plano.offer_id}>{plano.name} — {plano.offer_id}</option>
+                  ))}
                 </select>
               </label>
               <button className="filters-search" type="submit">Pesquisar</button>
