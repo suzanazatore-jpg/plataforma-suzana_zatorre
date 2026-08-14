@@ -70,6 +70,94 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+.admin-shell .filters-wrap {
+  position: relative;
+}
+.admin-shell .btn-ghost.filter-active {
+  border-color: var(--hot);
+  color: #fff;
+}
+.admin-shell .btn-ghost.filter-active svg {
+  color: var(--hot);
+}
+.admin-shell .filters-panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(300px, calc(100vw - 32px));
+  padding: 16px;
+  background: #242426;
+  border: 1px solid #36363a;
+  border-radius: 12px;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .58);
+}
+.admin-shell .filters-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 13px;
+  margin-bottom: 13px;
+  border-bottom: 1px solid #39393d;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+.admin-shell .filters-panel form,
+.admin-shell .filters-panel label {
+  display: grid;
+}
+.admin-shell .filters-panel form {
+  gap: 11px;
+}
+.admin-shell .filters-panel label {
+  gap: 6px;
+  color: #dedee3;
+  font-size: 11px;
+  font-weight: 700;
+}
+.admin-shell .filters-panel input,
+.admin-shell .filters-panel select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #4a4a4f;
+  border-radius: 7px;
+  padding: 11px 10px;
+  background: #414144;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  color-scheme: dark;
+  outline: none;
+}
+.admin-shell .filters-panel input:focus,
+.admin-shell .filters-panel select:focus {
+  border-color: var(--hot);
+}
+.admin-shell .filters-panel input::placeholder {
+  color: #929297;
+}
+.admin-shell .filters-search,
+.admin-shell .filters-clear {
+  min-height: 40px;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-shell .filters-search {
+  margin-top: 2px;
+  border: 0;
+  background: var(--hot);
+  color: #fff;
+}
+.admin-shell .filters-clear {
+  border: 1px solid #444449;
+  background: #303033;
+  color: #bdbdc3;
+}
 .admin-shell .btn-ghost {
   border: 1px solid var(--line);
   background: transparent;
