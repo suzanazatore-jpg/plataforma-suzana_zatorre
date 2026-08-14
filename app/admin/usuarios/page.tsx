@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 type Resultado = { ok: boolean; mensagem: string };
 type CursoOpcao = { id: string; title: string; slug: string };
 type AlunaImportada = { nome: string; email: string; telefone?: string; dataExpiracao?: string; dataCompra?: string };
-type PlanoOpcao = { id: string; name: string };
+type PlanoOpcao = { id: string; name: string; offer_id?: string };
 
 async function validarAdministradora() {
   const clienteSessao = createSupabaseServerClient();
@@ -456,6 +456,9 @@ type FiltrosAlunas = {
   cadastro?: string;
   ultimoLogin?: string;
   status?: string;
+  curso?: string;
+  plano?: string;
+  oferta?: string;
 };
 
 function dataLocalISO(data?: string | null) {
@@ -472,17 +475,17 @@ export default async function UsuariosPage({ searchParams }: { searchParams?: Fi
 
   if (!supabase) erroConexao = true;
   else {
-    const [{ data: profiles, error: profilesError }, { data: enrollments, error: enrollmentsError }, { data: authData, error: authError }, { data: courses, error: coursesError }] = await Promise.all([
+    const [{ data: profiles, error: profilesError }, { data: enrollments, error: enrollmentsError }, { data: authData, error: authError }, { data: courses, error: coursesError }, { data: plansData, error: plansError }] = await Promise.all([
       supabase.from('profiles').select('id, name, email, status, created_at').order('created_at', { ascending: false }),
-      supabase.from('enrollments').select('profile_id, status, expires_at'),
+      supabase.from('enrollments').select('profile_id, course_id, status, expires_at'),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-      supabase.from('courses').select('id, title, slug').order('sort_order', { ascending: true })
+      supabase.from('courses').select('id, title, slug').order('sort_order', { ascending: true }),
+      supabase.from('plans').select('id, name, offer_id, plan_courses(course_id)').order('name', { ascending: true })
     ]);
-    if (profilesError || enrollmentsError || authError || coursesError) erroConexao = true;
+    if (profilesError || enrollmentsError || authError || coursesError || plansError) erroConexao = true;
     else {
       cursos = courses || [];
-      const { data: plansData } = await supabase.from('plans').select('id, name').order('name', { ascending: true });
-      planos = plansData || [];
+      planos = (plansData || []).map((plano: any) => ({ id: plano.id, name: plano.name, offer_id: plano.offer_id }));
       alunas = (profiles || []).map((profile) => {
         const matriculas = (enrollments || []).filter((item) => item.profile_id === profile.id);
         const usuarioAuth = authData?.users?.find((usuario) => usuario.id === profile.id);
@@ -497,7 +500,8 @@ export default async function UsuariosPage({ searchParams }: { searchParams?: Fi
           cadastradaEm: formatarData(profile.created_at), acesso: ultimoAcesso.acesso, acessoSub: ultimoAcesso.acessoSub,
           vencLabel: venceu ? 'venceu em' : 'acesso até', vencData: formatarData(vencimentoMaisProximo), vencTom: venceu ? 'exp' : faltamTrintaDias ? 'warn' : '',
           cursos: matriculas.length === 0 ? 'Sem acesso' : matriculas.length === 1 ? '1 curso' : `${matriculas.length} cursos`, ativo,
-          bloqueada: profile.status !== 'active', venceu, ultimoLogin: usuarioAuth?.last_sign_in_at || null, criadaEm: profile.created_at
+          bloqueada: profile.status !== 'active', venceu, ultimoLogin: usuarioAuth?.last_sign_in_at || null, criadaEm: profile.created_at,
+          cursoIds: matriculas.map((item) => item.course_id)
         };
       });
 
@@ -507,6 +511,13 @@ export default async function UsuariosPage({ searchParams }: { searchParams?: Fi
       const cadastro = String(searchParams?.cadastro || '');
       const ultimoLogin = String(searchParams?.ultimoLogin || '');
       const status = String(searchParams?.status || '');
+      const curso = String(searchParams?.curso || '');
+      const plano = String(searchParams?.plano || '');
+      const oferta = String(searchParams?.oferta || '');
+      const planoSelecionado = (plansData || []).find((item: any) => item.id === plano);
+      const planoDaOferta = (plansData || []).find((item: any) => item.offer_id === oferta);
+      const cursosDoPlano = (planoSelecionado?.plan_courses || []).map((item: any) => item.course_id);
+      const cursosDaOferta = (planoDaOferta?.plan_courses || []).map((item: any) => item.course_id);
       alunas = alunas.filter((aluna) => {
         if (nome && !aluna.nome.toLocaleLowerCase('pt-BR').includes(nome)) return false;
         if (email && !aluna.email.toLowerCase().includes(email)) return false;
@@ -517,6 +528,9 @@ export default async function UsuariosPage({ searchParams }: { searchParams?: Fi
         if (status === 'bloqueada' && !aluna.bloqueada) return false;
         if (status === 'expirada' && !aluna.venceu) return false;
         if (status === 'nunca-acessou' && aluna.ultimoLogin) return false;
+        if (curso && !aluna.cursoIds.includes(curso)) return false;
+        if (plano && !aluna.cursoIds.some((id: string) => cursosDoPlano.includes(id))) return false;
+        if (oferta && !aluna.cursoIds.some((id: string) => cursosDaOferta.includes(id))) return false;
         return true;
       });
     }
