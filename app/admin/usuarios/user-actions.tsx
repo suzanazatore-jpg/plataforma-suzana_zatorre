@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Pencil, Trash2, Download, Upload, X, Filter, Mail, BookOpen, UserRound, Clock } from 'lucide-react';
 
 type Resultado = { ok: boolean; mensagem: string };
@@ -60,8 +60,10 @@ function lerCsv(conteudo: string): AlunaImportada[] {
 
 export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [] }: { importarUsuarios: ImportarUsuarios; cursos?: CursoOpcao[]; planos?: PlanoOpcao[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const [aberto, setAberto] = useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [processando, setProcessando] = useState(false);
   const [arquivoNome, setArquivoNome] = useState('');
   const [alunas, setAlunas] = useState<AlunaImportada[]>([]);
@@ -134,7 +136,60 @@ export function ListaUsuariosButtons({ importarUsuarios, cursos = [], planos = [
       <a className="btn-ghost" href="/api/admin/alunas-export" download>
         <Download size={15} /> Baixar
       </a>
-      <button className="btn-ghost" type="button"><Filter size={15} /> Filtrar</button>
+      <div className="filters-wrap">
+        <button
+          className={`btn-ghost${searchParams.toString() ? ' filter-active' : ''}`}
+          type="button"
+          onClick={() => setFiltrosAbertos((valor) => !valor)}
+          aria-expanded={filtrosAbertos}
+          aria-controls="student-filters"
+        >
+          <Filter size={15} /> Filtros
+        </button>
+
+        {filtrosAbertos && (
+          <div className="filters-panel" id="student-filters">
+            <div className="filters-title"><Filter size={17} /> Filtros de pesquisa</div>
+            <form action="/admin/usuarios" method="get">
+              <label>Nome da aluna
+                <input name="nome" defaultValue={searchParams.get('nome') || ''} placeholder="Nome da aluna" />
+              </label>
+              <label>E-mail da aluna
+                <input name="email" type="email" defaultValue={searchParams.get('email') || ''} placeholder="E-mail da aluna" />
+              </label>
+              <label>Código da aluna
+                <input name="codigo" defaultValue={searchParams.get('codigo') || ''} placeholder="Código da aluna" />
+              </label>
+              <label>Data de cadastro
+                <input name="cadastro" type="date" defaultValue={searchParams.get('cadastro') || ''} />
+              </label>
+              <label>Data do último login
+                <input name="ultimoLogin" type="date" defaultValue={searchParams.get('ultimoLogin') || ''} />
+              </label>
+              <label>Status da aluna
+                <select name="status" defaultValue={searchParams.get('status') || ''}>
+                  <option value="">Todas</option>
+                  <option value="ativa">Ativa</option>
+                  <option value="bloqueada">Bloqueada</option>
+                  <option value="expirada">Acesso expirado</option>
+                  <option value="nunca-acessou">Nunca acessou</option>
+                </select>
+              </label>
+              <button className="filters-search" type="submit">Pesquisar</button>
+              <button
+                className="filters-clear"
+                type="button"
+                onClick={() => {
+                  setFiltrosAbertos(false);
+                  router.push('/admin/usuarios');
+                }}
+              >
+                Limpar filtros
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
       <button className="btn-pink" type="button" onClick={() => setAberto(true)}>
         <Plus size={15} /> Subir planilha
       </button>
