@@ -449,7 +449,21 @@ function criarIniciais(nome: string) {
   return `${partes[0][0]}${partes[partes.length - 1][0]}`.toUpperCase();
 }
 
-export default async function UsuariosPage() {
+type FiltrosAlunas = {
+  nome?: string;
+  email?: string;
+  codigo?: string;
+  cadastro?: string;
+  ultimoLogin?: string;
+  status?: string;
+};
+
+function dataLocalISO(data?: string | null) {
+  if (!data) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date(data));
+}
+
+export default async function UsuariosPage({ searchParams }: { searchParams?: FiltrosAlunas }) {
   const supabase = createSupabaseAdminClient();
   let alunas: any[] = [];
   let cursos: CursoOpcao[] = [];
@@ -482,8 +496,28 @@ export default async function UsuariosPage() {
           id: profile.id, ini: criarIniciais(profile.name || profile.email || 'Aluna'), nome: profile.name || 'Aluna sem nome', email: profile.email || '',
           cadastradaEm: formatarData(profile.created_at), acesso: ultimoAcesso.acesso, acessoSub: ultimoAcesso.acessoSub,
           vencLabel: venceu ? 'venceu em' : 'acesso até', vencData: formatarData(vencimentoMaisProximo), vencTom: venceu ? 'exp' : faltamTrintaDias ? 'warn' : '',
-          cursos: matriculas.length === 0 ? 'Sem acesso' : matriculas.length === 1 ? '1 curso' : `${matriculas.length} cursos`, ativo
+          cursos: matriculas.length === 0 ? 'Sem acesso' : matriculas.length === 1 ? '1 curso' : `${matriculas.length} cursos`, ativo,
+          bloqueada: profile.status !== 'active', venceu, ultimoLogin: usuarioAuth?.last_sign_in_at || null, criadaEm: profile.created_at
         };
+      });
+
+      const nome = String(searchParams?.nome || '').trim().toLocaleLowerCase('pt-BR');
+      const email = String(searchParams?.email || '').trim().toLowerCase();
+      const codigo = String(searchParams?.codigo || '').trim().toLowerCase();
+      const cadastro = String(searchParams?.cadastro || '');
+      const ultimoLogin = String(searchParams?.ultimoLogin || '');
+      const status = String(searchParams?.status || '');
+      alunas = alunas.filter((aluna) => {
+        if (nome && !aluna.nome.toLocaleLowerCase('pt-BR').includes(nome)) return false;
+        if (email && !aluna.email.toLowerCase().includes(email)) return false;
+        if (codigo && !aluna.id.toLowerCase().includes(codigo)) return false;
+        if (cadastro && dataLocalISO(aluna.criadaEm) !== cadastro) return false;
+        if (ultimoLogin && dataLocalISO(aluna.ultimoLogin) !== ultimoLogin) return false;
+        if (status === 'ativa' && !aluna.ativo) return false;
+        if (status === 'bloqueada' && !aluna.bloqueada) return false;
+        if (status === 'expirada' && !aluna.venceu) return false;
+        if (status === 'nunca-acessou' && aluna.ultimoLogin) return false;
+        return true;
       });
     }
   }
@@ -493,7 +527,7 @@ export default async function UsuariosPage() {
     <div className="pad">
       <div className="blk-title">Usuários</div>
       <p className="blk-sub">Cadastre alunas, acompanhe o acesso e libere os cursos de cada uma.</p>
-      <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Total de alunas cadastradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
+      <div className="u-summary"><div className="ic"><Users size={26} /></div><div className="t">Alunas encontradas<b>{alunas.length} {alunas.length === 1 ? 'aluna' : 'alunas'}</b></div></div>
       <div className="utitle"><div><h2>Lista de alunas</h2><p>Clique numa aluna para gerenciar o acesso aos cursos.</p></div><div className="tools"><ListaUsuariosButtons importarUsuarios={importarUsuarios} cursos={cursos} planos={planos} /><NovoUsuarioButton criarUsuario={criarUsuario} cursos={cursos} /></div></div>
       {erroConexao ? <div className="u-panel" style={{ padding: 24 }}>Não foi possível carregar os usuários do Supabase.</div> :
       <div className="u-panel"><table className="utable"><thead><tr><th>Aluna</th><th className="hide">Cadastrada em</th><th>Último acesso</th><th>Vencimento</th><th className="hide">Cursos</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
