@@ -110,6 +110,16 @@
 .admin-shell .filters-panel form {
   gap: 11px;
 }
+.admin-shell .filters-divider {
+  margin-top: 3px;
+  padding-top: 12px;
+  border-top: 1px solid #39393d;
+  color: #ff6d91;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 .admin-shell .filters-panel label {
   gap: 6px;
   color: #dedee3;
