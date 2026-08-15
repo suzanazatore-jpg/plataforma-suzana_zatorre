@@ -302,23 +302,21 @@ export default async function CoursePage({
             {isAdmin ? 'Nenhuma pergunta nesta aula ainda.' : 'Ficou com dúvida nesta aula?'}
           </p>
           <p style={{ color: '#8a8a90', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-            {isAdmin ? 'Quando uma aluna perguntar, a mensagem aparece aqui.' : 'Escreva abaixo. Sua pergunta vai direto pro WhatsApp da Suzana.'}
+            {isAdmin ? 'As perguntas das alunas aparecem aqui. Você também pode escrever abaixo.' : 'Escreva abaixo. Sua pergunta vai direto pro WhatsApp da Suzana.'}
           </p>
         </div>
       )}
 
-      {!isAdmin && (
-        <form action={addLessonComment} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, borderTop: '1px solid #26262b', paddingTop: 14, marginTop: 4 }}>
-          <input type="hidden" name="lessonId" value={current.id} />
-          <input type="hidden" name="courseSlug" value={course.slug} />
-          <input type="hidden" name="lessonTitle" value={current.title} />
-          <input type="hidden" name="courseTitle" value={course.title} />
-          <textarea name="body" maxLength={1000} required rows={1} placeholder="escreva sua pergunta..." style={{ flex: 1, resize: 'none', background: '#1a1a1e', border: '1px solid #2c2c33', borderRadius: 20, color: '#f2f2f4', fontSize: 14, padding: '11px 16px', fontFamily: 'inherit', lineHeight: 1.5 }} />
-          <button type="submit" aria-label="Enviar pergunta" style={{ width: 44, height: 44, flex: '0 0 auto', border: 0, borderRadius: '50%', background: '#ff2e63', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <Send size={18} />
-          </button>
-        </form>
-      )}
+      <form action={addLessonComment} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, borderTop: '1px solid #26262b', paddingTop: 14, marginTop: 4 }}>
+        <input type="hidden" name="lessonId" value={current.id} />
+        <input type="hidden" name="courseSlug" value={course.slug} />
+        <input type="hidden" name="lessonTitle" value={current.title} />
+        <input type="hidden" name="courseTitle" value={course.title} />
+        <textarea name="body" maxLength={1000} required rows={1} placeholder="escreva sua pergunta..." style={{ flex: 1, resize: 'none', background: '#1a1a1e', border: '1px solid #2c2c33', borderRadius: 20, color: '#f2f2f4', fontSize: 14, padding: '11px 16px', fontFamily: 'inherit', lineHeight: 1.5 }} />
+        <button type="submit" aria-label="Enviar pergunta" style={{ width: 44, height: 44, flex: '0 0 auto', border: 0, borderRadius: '50%', background: '#ff2e63', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <Send size={18} />
+        </button>
+      </form>
     </section>
   );
 
