@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { ArrowLeft, CheckCircle2, Download, Play } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Play, Send } from 'lucide-react';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getCurrentStudent } from '@/lib/supabase/session';
@@ -20,20 +20,76 @@ async function addLessonComment(formData: FormData) {
   'use server';
   const lessonId = String(formData.get('lessonId') || '');
   const courseSlug = String(formData.get('courseSlug') || '');
+  const lessonTitle = String(formData.get('lessonTitle') || '');
+  const courseTitle = String(formData.get('courseTitle') || '');
   const body = String(formData.get('body') || '').trim();
   if (!UUID.test(lessonId) || !courseSlug || !body || body.length > 1000) return;
 
   const supabase = createSupabaseServerClient();
-  if (!supabase) return;
+  const admin = createSupabaseAdminClient();
+  if (!supabase || !admin) return;
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return;
 
-  await supabase.from('lesson_comments').insert({
+  const { data: lesson } = await admin
+    .from('lessons')
+    .select('course_id')
+    .eq('id', lessonId)
+    .maybeSingle();
+  if (!lesson) return;
+
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('name, email, phone, role, status')
+    .eq('id', auth.user.id)
+    .maybeSingle();
+
+  // Só quem tem acesso ativo ao curso (ou a admin) pode enviar pergunta.
+  const isActiveAdmin = profile?.role === 'admin' && profile.status === 'active';
+  if (!isActiveAdmin) {
+    const { data: enrollment } = await admin
+      .from('enrollments')
+      .select('id')
+      .eq('profile_id', auth.user.id)
+      .eq('course_id', lesson.course_id)
+      .eq('status', 'active')
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .maybeSingle();
+    if (!enrollment) return;
+  }
+
+  // 1) Registra a pergunta (fica visível só pra aluna que perguntou e pra admin).
+  await admin.from('lesson_comments').insert({
     lesson_id: lessonId,
     profile_id: auth.user.id,
     body
   });
+
+  // 2) Dispara pro Botconversa -> WhatsApp da Suzana. Best-effort: se falhar
+  //    ou a variável não estiver configurada, a pergunta já ficou salva.
+  const webhook = process.env.BOTCONVERSA_WEBHOOK_URL?.trim();
+  if (webhook) {
+    try {
+      await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: profile?.name || 'Aluna',
+          email: profile?.email || '',
+          telefone: profile?.phone || '',
+          curso: courseTitle,
+          aula: lessonTitle,
+          pergunta: body,
+          mensagem: body
+        })
+      });
+    } catch (erro) {
+      console.error('Falha ao enviar pergunta para o Botconversa:', erro);
+    }
+  }
+
   revalidatePath(`/area/${courseSlug}`);
+  redirect(`/area/${courseSlug}?aula=${lessonId}&tab=comentarios&enviado=1`);
 }
 
 async function toggleLessonProgress(formData: FormData) {
@@ -95,7 +151,7 @@ export default async function CoursePage({
   searchParams
 }: {
   params: { curso: string };
-  searchParams?: { aula?: string; tab?: string };
+  searchParams?: { aula?: string; tab?: string; enviado?: string };
 }) {
   const student = await getCurrentStudent();
   if (!student) redirect('/?erro=login');
@@ -199,9 +255,72 @@ export default async function CoursePage({
     replies.push(reply);
     repliesByParent.set(reply.parent_id, replies);
   });
+  // Privacidade: admin vê todas as perguntas; a aluna vê só as dela; ninguém vê as das outras.
+  const visibleRoots = isAdmin
+    ? rootComments
+    : rootComments.filter((comment: any) => comment.profile_id === student.userId);
+  const enviado = searchParams?.enviado === '1';
   const commentsOpen = searchParams?.tab === 'comentarios';
   const lessonHref = `/area/${course.slug}?aula=${current.id}`;
   const initial = student.displayName.charAt(0).toUpperCase();
+
+  const commentsPanel = (
+    <section style={{ padding: '4px 0 2px' }}>
+      {enviado && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(37,211,102,.12)', color: '#8fe3aa', border: '1px solid rgba(37,211,102,.32)', borderRadius: 12, padding: '11px 14px', fontSize: 14, marginBottom: 16 }}>
+          <CheckCircle2 size={16} /> Pergunta enviada! A Suzana responde no seu WhatsApp.
+        </div>
+      )}
+
+      {visibleRoots.length ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: isAdmin ? 2 : 18 }}>
+          {visibleRoots.map((comment: any) => (
+            <article key={comment.id} style={{ background: '#17171b', border: '1px solid #26262b', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6, gap: 10 }}>
+                <strong style={{ color: '#f2f2f4', fontSize: 14 }}>{isAdmin ? comment.author : 'Sua pergunta'}</strong>
+                <time style={{ color: '#7a7a80', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
+              </div>
+              <p style={{ color: '#c9c9cf', fontSize: 14, lineHeight: 1.6, margin: 0 }}>{comment.body}</p>
+              {(repliesByParent.get(comment.id) || []).map((reply: any) => (
+                <div key={reply.id} style={{ marginTop: 12, paddingLeft: 14, borderLeft: '2px solid #ff2e63' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4, gap: 10 }}>
+                    <strong style={{ color: '#ff6b93', fontSize: 13 }}>Resposta da Suzana</strong>
+                    <time style={{ color: '#7a7a80', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(reply.created_at).toLocaleDateString('pt-BR')}</time>
+                  </div>
+                  <p style={{ color: '#c9c9cf', fontSize: 14, lineHeight: 1.6, margin: 0 }}>{reply.body}</p>
+                </div>
+              ))}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div style={{ minHeight: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '24px 12px' }}>
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#3a3a42" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          </svg>
+          <p style={{ color: '#c9c9cf', fontSize: 15, fontWeight: 500, margin: '12px 0 4px' }}>
+            {isAdmin ? 'Nenhuma pergunta nesta aula ainda.' : 'Ficou com dúvida nesta aula?'}
+          </p>
+          <p style={{ color: '#8a8a90', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+            {isAdmin ? 'Quando uma aluna perguntar, a mensagem aparece aqui.' : 'Escreva abaixo. Sua pergunta vai direto pro WhatsApp da Suzana.'}
+          </p>
+        </div>
+      )}
+
+      {!isAdmin && (
+        <form action={addLessonComment} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, borderTop: '1px solid #26262b', paddingTop: 14, marginTop: 4 }}>
+          <input type="hidden" name="lessonId" value={current.id} />
+          <input type="hidden" name="courseSlug" value={course.slug} />
+          <input type="hidden" name="lessonTitle" value={current.title} />
+          <input type="hidden" name="courseTitle" value={course.title} />
+          <textarea name="body" maxLength={1000} required rows={1} placeholder="escreva sua pergunta..." style={{ flex: 1, resize: 'none', background: '#1a1a1e', border: '1px solid #2c2c33', borderRadius: 20, color: '#f2f2f4', fontSize: 14, padding: '11px 16px', fontFamily: 'inherit', lineHeight: 1.5 }} />
+          <button type="submit" aria-label="Enviar pergunta" style={{ width: 44, height: 44, flex: '0 0 auto', border: 0, borderRadius: '50%', background: '#ff2e63', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <Send size={18} />
+          </button>
+        </form>
+      )}
+    </section>
+  );
 
   return (
     <div className="ep-page">
@@ -217,26 +336,7 @@ export default async function CoursePage({
           <div className="ep-video">
             {current.video_url ? <iframe src={current.video_url} title={current.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <button type="button" className="ep-play" aria-label="Aula sem vídeo"><Play size={28} fill="currentColor" /></button>}
           </div>
-          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<LessonDescription text={current.description || course.description || course.subtitle || 'Curso sem descrição.'} />} comments={<section className="ep-comments">
-            <div className="ep-comment-list">
-              {rootComments.length ? rootComments.map((comment: any) => <article className="ep-comment" key={comment.id}>
-                <strong>{comment.author}</strong>
-                <time>{new Date(comment.created_at).toLocaleDateString('pt-BR')}</time>
-                <p>{comment.body}</p>
-                {(repliesByParent.get(comment.id) || []).map((reply: any) => <div className="ep-admin-reply" key={reply.id}>
-                  <strong>Resposta da Suzana</strong>
-                  <time>{new Date(reply.created_at).toLocaleDateString('pt-BR')}</time>
-                  <p>{reply.body}</p>
-                </div>)}
-              </article>) : <p className="ep-empty-note">Ainda não há comentários nesta aula. Seja a primeira a comentar.</p>}
-            </div>
-            {course.comments_enabled ? <form action={addLessonComment} className="ep-comment-form">
-              <input type="hidden" name="lessonId" value={current.id} />
-              <input type="hidden" name="courseSlug" value={course.slug} />
-              <textarea name="body" maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." />
-              <button type="submit">Publicar comentário</button>
-            </form> : <p className="ep-comments-disabled">Os comentários estão desativados neste curso.</p>}
-          </section>} />
+          <CourseTabs initiallyOpen={commentsOpen} informationHref={lessonHref} commentsHref={`${lessonHref}&tab=comentarios`} information={<LessonDescription text={current.description || course.description || course.subtitle || 'Curso sem descrição.'} />} comments={commentsPanel} />
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/${course.slug}?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>Aula anterior</Link>
             <form action={toggleLessonProgress}>
