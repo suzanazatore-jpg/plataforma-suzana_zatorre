@@ -68,9 +68,16 @@ async function addLessonComment(formData: FormData) {
   // 2) Dispara pro Botconversa -> WhatsApp da Suzana. Best-effort: se falhar
   //    ou a variável não estiver configurada, a pergunta já ficou salva.
   const webhook = process.env.BOTCONVERSA_WEBHOOK_URL?.trim();
-  if (webhook) {
+  if (!webhook) {
+    await admin.from('integration_logs').insert({
+      kind: 'botconversa',
+      ok: false,
+      status: null,
+      detail: 'BOTCONVERSA_WEBHOOK_URL nao configurada no ambiente'
+    });
+  } else {
     try {
-      await fetch(webhook, {
+      const resposta = await fetch(webhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,8 +90,20 @@ async function addLessonComment(formData: FormData) {
           mensagem: body
         })
       });
-    } catch (erro) {
-      console.error('Falha ao enviar pergunta para o Botconversa:', erro);
+      const corpo = await resposta.text().catch(() => '');
+      await admin.from('integration_logs').insert({
+        kind: 'botconversa',
+        ok: resposta.ok,
+        status: resposta.status,
+        detail: corpo.slice(0, 500)
+      });
+    } catch (erro: any) {
+      await admin.from('integration_logs').insert({
+        kind: 'botconversa',
+        ok: false,
+        status: null,
+        detail: String(erro?.message || erro).slice(0, 500)
+      });
     }
   }
 
