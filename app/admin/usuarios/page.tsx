@@ -466,6 +466,27 @@ function dataLocalISO(data?: string | null) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date(data));
 }
 
+// Busca TODAS as matrículas em páginas. O Supabase/PostgREST devolve no máximo
+// 1000 linhas por requisição; sem paginar, matrículas além disso ficam de fora
+// e alunas com acesso aparecem como "Sem acesso". Percorre em blocos até acabar.
+async function carregarTodasMatriculas(supabase: any) {
+  const todas: any[] = [];
+  const passo = 1000;
+  let inicio = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select('profile_id, course_id, status, expires_at')
+      .range(inicio, inicio + passo - 1);
+    if (error) return { data: null as any[] | null, error };
+    const lote = data || [];
+    if (lote.length === 0) break;
+    todas.push(...lote);
+    inicio += lote.length;
+  }
+  return { data: todas, error: null as any };
+}
+
 export default async function UsuariosPage({ searchParams }: { searchParams?: FiltrosAlunas }) {
   const supabase = createSupabaseAdminClient();
   let alunas: any[] = [];
@@ -477,7 +498,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams?: Fi
   else {
     const [{ data: profiles, error: profilesError }, { data: enrollments, error: enrollmentsError }, { data: authData, error: authError }, { data: courses, error: coursesError }, { data: plansData, error: plansError }] = await Promise.all([
       supabase.from('profiles').select('id, name, email, status, created_at').order('created_at', { ascending: false }),
-      supabase.from('enrollments').select('profile_id, course_id, status, expires_at'),
+      carregarTodasMatriculas(supabase),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       supabase.from('courses').select('id, title, slug').order('sort_order', { ascending: true }),
       supabase.from('plans').select('id, name, offer_id, plan_courses(course_id)').order('name', { ascending: true })
