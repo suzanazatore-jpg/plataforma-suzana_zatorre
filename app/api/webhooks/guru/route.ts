@@ -65,34 +65,48 @@ function getProduct(payload: GuruPayload) {
   };
 }
 
+// Varre o payload INTEIRO e coleta os ids de oferta de TODOS os produtos comprados
+// (principal + order bumps + upsells). Antes olhava so o produto principal e o
+// primeiro item, por isso o bump nao era liberado.
 function collectOfferCandidates(payload: GuruPayload) {
-  const paths = [
-    'product.id',
-    'product.marketplace_id',
-    'product.internal_id',
-    'product.offer.id',
-    'product.offer_id',
-    'offer.id',
-    'offer.marketplace_id',
-    'offer.internal_id',
-    'items.0.id',
-    'items.0.marketplace_id',
-    'items.0.internal_id',
-    'items.0.offer.id',
-    'items.0.offer_id'
-  ];
-
   const found = new Set<string>();
-  for (const path of paths) {
-    const value = path.split('.').reduce<unknown>((current, key) => {
-      if (!current || typeof current !== 'object') return undefined;
-      return (current as Record<string, unknown>)[key];
-    }, payload);
-    if ((typeof value === 'string' || typeof value === 'number') && String(value).trim()) {
-      found.add(String(value).trim());
+  const add = (value: unknown) => {
+    if (typeof value === 'string' || typeof value === 'number') {
+      const texto = String(value).trim();
+      if (texto) found.add(texto);
     }
-  }
+  };
 
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    // Um no e "produto" quando tem oferta/marketplace_id, ou nome + id.
+    // Ignoramos nos de contato (tem email/telefone) pra nao coletar id de pessoa.
+    const pareceContato = 'email' in obj || 'phone' in obj || 'phone_number' in obj || 'doc' in obj;
+    const pareceProduto =
+      'offer' in obj || 'offer_id' in obj || 'marketplace_id' in obj || ('name' in obj && 'id' in obj);
+    if (pareceProduto && !pareceContato) {
+      add(obj.id);
+      add(obj.marketplace_id);
+      add(obj.internal_id);
+      add(obj.offer_id);
+      if (obj.offer && typeof obj.offer === 'object') {
+        const offer = obj.offer as Record<string, unknown>;
+        add(offer.id);
+        add(offer.marketplace_id);
+        add(offer.internal_id);
+      }
+    }
+    for (const value of Object.values(obj)) {
+      if (value && typeof value === 'object') walk(value);
+    }
+  };
+
+  walk(payload);
   return Array.from(found);
 }
 
@@ -224,29 +238,28 @@ export async function POST(request: Request) {
       .select('id');
     revokedCount += (revokedByOrder || []).length;
 
-    // Caminho 2 (rede de seguranca): por e-mail + cursos do plano da oferta reembolsada.
+    // Caminho 2 (rede de seguranca): por e-mail + cursos dos planos das ofertas reembolsadas.
     if (!revokedCount && refundProfileId && offerCandidates.length) {
-      const { data: plan } = await supabase
+      const { data: plansRefund } = await supabase
         .from('plans')
-        .select('id')
-        .in('offer_id', offerCandidates)
-        .maybeSingle();
-      if (plan) {
-        const { data: planCourseRows } = await supabase
-          .from('plan_courses')
-          .select('course_id')
-          .eq('plan_id', plan.id);
-        const courseIds = (planCourseRows || []).map((row: any) => row.course_id);
-        if (courseIds.length) {
-          const { data: revokedByPlan } = await supabase
-            .from('enrollments')
-            .update({ status: 'revoked', updated_at: revokedAt })
-            .eq('profile_id', refundProfileId)
-            .in('course_id', courseIds)
-            .eq('status', 'active')
-            .select('id');
-          revokedCount += (revokedByPlan || []).length;
-        }
+        .select('plan_courses(course_id)')
+        .in('offer_id', offerCandidates);
+      const courseIds = Array.from(
+        new Set(
+          (plansRefund || [])
+            .flatMap((plan: any) => (plan.plan_courses || []).map((row: any) => row.course_id))
+            .filter(Boolean)
+        )
+      );
+      if (courseIds.length) {
+        const { data: revokedByPlan } = await supabase
+          .from('enrollments')
+          .update({ status: 'revoked', updated_at: revokedAt })
+          .eq('profile_id', refundProfileId)
+          .in('course_id', courseIds)
+          .eq('status', 'active')
+          .select('id');
+        revokedCount += (revokedByPlan || []).length;
       }
     }
 
@@ -270,35 +283,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Buyer email was not found.' }, { status: 400 });
   }
 
-  // 1) Tenta achar um PLANO pelo id da oferta do Guru.
-  //    Casa o offer_id contra os vários campos candidatos do payload.
-  let planId: string | null = null;
+  // 1) Acha TODOS os planos das ofertas compradas (principal + bumps/upsells) e
+  //    junta os cursos de todos, cada curso com a validade do seu proprio plano.
   let planName: string | null = null;
-  let planPeriodDays: number | null = null;
-  let targetCourses: { id: string; slug: string; title: string }[] = [];
+  let matchedPlanIds: string[] = [];
+  let targetCourses: { id: string; slug: string; title: string; expiresAt: string | null }[] = [];
 
   if (offerCandidates.length) {
-    const { data: plan } = await supabase
+    const { data: plans } = await supabase
       .from('plans')
-      .select('id, name, period_days')
-      .in('offer_id', offerCandidates)
-      .maybeSingle();
+      .select('id, name, period_days, plan_courses(courses(id, slug, title))')
+      .in('offer_id', offerCandidates);
 
-    if (plan) {
-      const { data: planCourseRows } = await supabase
-        .from('plan_courses')
-        .select('courses(id, slug, title)')
-        .eq('plan_id', plan.id);
-
-      const courses = (planCourseRows || [])
-        .map((row: any) => row.courses)
-        .filter((item: any) => item && item.id) as { id: string; slug: string; title: string }[];
-
-      if (courses.length) {
-        planId = plan.id;
-        planName = plan.name;
-        planPeriodDays = plan.period_days;
-        targetCourses = courses;
+    if (plans && plans.length) {
+      const byCourse = new Map<string, { id: string; slug: string; title: string; expiresAt: string | null }>();
+      const nomes: string[] = [];
+      for (const plan of plans as any[]) {
+        matchedPlanIds.push(plan.id);
+        if (plan.name) nomes.push(plan.name);
+        const exp = plan.period_days
+          ? new Date(Date.now() + plan.period_days * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+        for (const planCourse of plan.plan_courses || []) {
+          const course = planCourse.courses;
+          if (!course || !course.id) continue;
+          const prev = byCourse.get(course.id);
+          if (!prev) {
+            byCourse.set(course.id, { id: course.id, slug: course.slug, title: course.title, expiresAt: exp });
+          } else {
+            // Curso em mais de um plano: fica com a validade mais generosa.
+            const later =
+              prev.expiresAt === null || exp === null
+                ? null
+                : new Date(exp) > new Date(prev.expiresAt)
+                ? exp
+                : prev.expiresAt;
+            byCourse.set(course.id, { ...prev, expiresAt: later });
+          }
+        }
+      }
+      if (byCourse.size) {
+        targetCourses = Array.from(byCourse.values());
+        planName = nomes.join(' + ') || null;
       }
     }
   }
@@ -332,13 +358,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: message }, { status: 404 });
     }
 
-    targetCourses = [course];
+    targetCourses = [{ id: course.id, slug: course.slug, title: course.title, expiresAt: null }];
   }
 
-  // Validade: apenas quando veio de um plano (agora + period_days). Sem plano, mantem o default do banco.
-  const expiresAt = planPeriodDays
-    ? new Date(Date.now() + planPeriodDays * 24 * 60 * 60 * 1000).toISOString()
-    : null;
   const primaryCourse = targetCourses[0];
 
   // A six-digit numeric password is easier to type from email or WhatsApp.
@@ -401,7 +423,7 @@ export async function POST(request: Request) {
       external_order_id: eventId,
       purchased_at: purchasedAt
     };
-    if (expiresAt) row.expires_at = expiresAt;
+    if (item.expiresAt) row.expires_at = item.expiresAt;
     return row;
   });
 
@@ -446,13 +468,13 @@ export async function POST(request: Request) {
           phone,
           product_id: product.id,
           product_name: product.name,
-          plan_id: planId,
+          plan_id: matchedPlanIds[0] || null,
           plan_name: planName,
-          plan_period_days: planPeriodDays,
+          plan_ids: matchedPlanIds,
           course_slug: primaryCourse.slug,
           course_name: primaryCourse.title,
           courses: targetCourses.map((item) => ({ slug: item.slug, name: item.title })),
-          access_expires_at: expiresAt,
+          access_expires_at: primaryCourse.expiresAt,
           academy_url: `${academyUrl()}/login`,
           is_new_user: isNewUser,
           temporary_password: isNewUser ? temporaryPassword : null,
