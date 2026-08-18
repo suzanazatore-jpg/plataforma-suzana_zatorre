@@ -150,6 +150,26 @@ function firstName(fullName: string | null) {
   return fullName?.trim().split(/\s+/)[0] || 'Aluna';
 }
 
+// Remove dados sensiveis antes de gravar o payload cru (so pra diagnostico).
+const SENSITIVE_KEYS = new Set([
+  'api_token', 'token', 'secret', 'password', 'senha',
+  'document', 'doc', 'cpf', 'cnpj', 'rg',
+  'email', 'phone', 'phone_number', 'phone_local_code',
+  'ip', 'address', 'zip_code', 'zipcode', 'cep',
+  'card', 'card_number', 'credit_card', 'holder', 'holder_name'
+]);
+function redactSensitive(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSensitive);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? '[redacted]' : redactSensitive(val);
+    }
+    return out;
+  }
+  return value;
+}
+
 async function markEvent(
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
   eventLogId: string | undefined,
@@ -207,7 +227,7 @@ export async function POST(request: Request) {
       source: 'guru',
       event_type: status,
       external_id: eventId,
-      payload: { email, phone, product_id: product.id, product_name: product.name, status, offer_candidates: offerCandidates },
+      payload: { email, phone, product_id: product.id, product_name: product.name, status, offer_candidates: offerCandidates, raw: redactSensitive(payload) },
       processed: false
     })
     .select('id')
