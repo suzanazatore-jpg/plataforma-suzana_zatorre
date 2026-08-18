@@ -170,6 +170,11 @@ function redactSensitive(value: unknown): unknown {
   return value;
 }
 
+function usuarioJaExiste(message: string) {
+  const m = message.toLowerCase();
+  return m.includes('already') && (m.includes('registered') || m.includes('exist'));
+}
+
 async function markEvent(
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
   eventLogId: string | undefined,
@@ -394,12 +399,15 @@ export async function POST(request: Request) {
     user_metadata: { name, phone, source: 'guru' }
   });
 
-  if (createError && !createError.message.toLowerCase().includes('already registered')) {
+  // O Supabase responde "already been registered" (com "been" no meio), que a checagem
+  // antiga (procurando "already registered") nao pegava -> por isso o order bump
+  // (2o evento com o mesmo e-mail) dava 500 e nao liberava o curso do bump.
+  if (createError && !usuarioJaExiste(createError.message)) {
     await markEvent(supabase, eventLog?.id, { error: createError.message });
     return NextResponse.json({ ok: false, error: createError.message }, { status: 500 });
   }
 
-  const isNewUser = Boolean(createdUser.user);
+  const isNewUser = Boolean(createdUser?.user);
 
   const { data: recovery, error: recoveryError } = await supabase.auth.admin.generateLink({
     type: 'recovery',
@@ -413,7 +421,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 
-  const profileId = createdUser.user?.id || recovery.user?.id;
+  const profileId = createdUser?.user?.id || recovery.user?.id;
   if (!profileId) {
     await markEvent(supabase, eventLog?.id, { error: 'Could not identify the Supabase user.' });
     return NextResponse.json({ ok: false, error: 'Could not identify the Supabase user.' }, { status: 409 });
