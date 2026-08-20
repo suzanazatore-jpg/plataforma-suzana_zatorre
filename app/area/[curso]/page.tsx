@@ -75,6 +75,16 @@ async function addLessonComment(formData: FormData) {
       detail: 'BOTCONVERSA_WEBHOOK_URL nao configurada no ambiente'
     });
   } else {
+    // Botconversa (acao "Telefone WhatsApp") ja adiciona o 55 na frente.
+    // Por isso enviamos o numero SEM o 55, senao ele fica duplicado (55 + 55...)
+    // e o disparo falha com erro 400. Removemos o 55 apenas quando ele e o
+    // codigo do pais (numero com 12+ digitos), preservando DDDs que comecam
+    // com 55 em numeros ja sem codigo do pais.
+    const digitsOnly = (profile?.phone || '').replace(/\D/g, '');
+    const phoneForBot = digitsOnly.length >= 12 && digitsOnly.startsWith('55')
+      ? digitsOnly.slice(2)
+      : digitsOnly;
+
     try {
       const resposta = await fetch(webhook, {
         method: 'POST',
@@ -82,7 +92,7 @@ async function addLessonComment(formData: FormData) {
         body: JSON.stringify({
           nome: profile?.name || 'Aluna',
           email: profile?.email || '',
-          telefone: profile?.phone || '',
+          telefone: phoneForBot,
           curso: courseTitle,
           aula: lessonTitle,
           pergunta: body,
