@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getCurrentStudent } from '@/lib/supabase/session';
 import { MaterialDownload } from '@/app/area/material-download';
+import { LessonDescription } from '@/app/area/lesson-description';
 import '@/app/area/evs/evs.css';
 
 export const dynamic = 'force-dynamic';
@@ -277,6 +278,7 @@ export default async function CoursePage({
     ? rootComments
     : rootComments.filter((comment: any) => comment.profile_id === student.userId);
   const enviado = searchParams?.enviado === '1';
+  const activeTab = searchParams?.tab === 'comentarios' ? 'comentarios' : 'descricao';
   const initial = student.displayName.charAt(0).toUpperCase();
 
   const commentsPanel = (
@@ -349,9 +351,28 @@ export default async function CoursePage({
           <div className="ep-video">
             {current.video_url ? <iframe src={current.video_url} title={current.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <button type="button" className="ep-play" aria-label="Aula sem vídeo"><Play size={28} fill="currentColor" /></button>}
           </div>
-          <section style={{ marginTop: 16 }}>
-            <h2 style={{ color: '#f2f2f4', fontSize: 16, fontWeight: 600, margin: '0 0 10px' }}>Comentários</h2>
-            {commentsPanel}
+          <section style={{ marginTop: 20 }}>
+            <div role="tablist" aria-label="Conteúdo da aula" style={{ display: 'flex', gap: 26, borderBottom: '1px solid #26262b', margin: '0 0 16px' }}>
+              <Link
+                href={`/area/${course.slug}?aula=${current.id}`}
+                role="tab"
+                aria-selected={activeTab === 'descricao'}
+                style={{ padding: '0 0 11px', fontWeight: 800, fontSize: 14, textDecoration: 'none', color: activeTab === 'descricao' ? '#ff2e63' : '#7a7a80', borderBottom: activeTab === 'descricao' ? '2px solid #ff2e63' : '2px solid transparent' }}
+              >
+                Descrição
+              </Link>
+              <Link
+                href={`/area/${course.slug}?aula=${current.id}&tab=comentarios`}
+                role="tab"
+                aria-selected={activeTab === 'comentarios'}
+                style={{ padding: '0 0 11px', fontWeight: 800, fontSize: 14, textDecoration: 'none', color: activeTab === 'comentarios' ? '#ff2e63' : '#7a7a80', borderBottom: activeTab === 'comentarios' ? '2px solid #ff2e63' : '2px solid transparent' }}
+              >
+                Comentários
+              </Link>
+            </div>
+            <div role="tabpanel">
+              {activeTab === 'comentarios' ? commentsPanel : <LessonDescription text={current.description} />}
+            </div>
           </section>
           <div className="ep-course-actions">
             <Link className={`ep-nav-button ${!previousLesson ? 'disabled' : ''}`} href={previousLesson ? `/area/${course.slug}?aula=${previousLesson.id}` : '#'} aria-disabled={!previousLesson}>Aula anterior</Link>
