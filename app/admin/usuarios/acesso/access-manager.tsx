@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Mail, Info } from 'lucide-react';
+import { Clock, Mail, Info, Check, Copy, MessageCircle } from 'lucide-react';
 
 export type CursoAcesso = {
   id: string;
@@ -14,6 +14,7 @@ export type CursoAcesso = {
 };
 
 type Resultado = { ok: boolean; mensagem: string };
+type ResultadoSenha = Resultado & { senha?: string; whatsappUrl?: string | null };
 type DadosAluna = { nome: string; email: string; telefone: string };
 
 type Props = {
@@ -23,7 +24,8 @@ type Props = {
   salvarAcessos: (alunaId: string, cursosAtivos: string[]) => Promise<Resultado>;
   dados?: DadosAluna;
   salvarDados?: (dados: { id: string; nome: string; email: string; telefone: string }) => Promise<Resultado>;
-  reenviarAcesso?: (alunaId: string) => Promise<Resultado>;
+  definirNovaSenha?: (dados: { alunaId: string; senha?: string }) => Promise<ResultadoSenha>;
+  enviarAcessoEmail?: (dados: { alunaId: string; senha: string }) => Promise<Resultado>;
   definirPrazo?: (dados: { alunaId: string; cursoId: string; tempo: string; dataFim?: string }) => Promise<Resultado>;
 };
 
@@ -47,7 +49,8 @@ export default function AccessManager({
   salvarAcessos,
   dados,
   salvarDados,
-  reenviarAcesso,
+  definirNovaSenha,
+  enviarAcessoEmail,
   definirPrazo
 }: Props) {
   const router = useRouter();
@@ -74,9 +77,15 @@ export default function AccessManager({
   const [retornoDados, setRetornoDados] = useState<Resultado | null>(null);
   const [salvandoDados, iniciarDados] = useTransition();
 
-  // Reenviar acesso
-  const [retornoReenvio, setRetornoReenvio] = useState<Resultado | null>(null);
-  const [reenviando, iniciarReenvio] = useTransition();
+  // Reenviar acesso (definir senha + enviar por WhatsApp/e-mail)
+  const [modoSenha, setModoSenha] = useState<'auto' | 'custom'>('auto');
+  const [senhaCustom, setSenhaCustom] = useState('');
+  const [acessoDefinido, setAcessoDefinido] = useState<{ senha: string; whatsappUrl: string | null } | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const [retornoSenha, setRetornoSenha] = useState<Resultado | null>(null);
+  const [definindoSenha, iniciarSenha] = useTransition();
+  const [retornoEmail, setRetornoEmail] = useState<Resultado | null>(null);
+  const [enviandoEmail, iniciarEmail] = useTransition();
 
   function alternarCurso(cursoId: string) {
     setRetornoAcesso(null);
@@ -148,14 +157,55 @@ export default function AccessManager({
     });
   }
 
-  function reenviar() {
-    if (!reenviarAcesso) return;
-    if (!window.confirm('Isso gera uma senha nova e reenvia o e-mail de acesso. A senha atual da aluna deixa de funcionar. Continuar?')) return;
-    setRetornoReenvio(null);
-    iniciarReenvio(async () => {
-      const resultado = await reenviarAcesso(alunaId);
-      setRetornoReenvio(resultado);
+  function definirSenha() {
+    if (!definirNovaSenha) return;
+    if (modoSenha === 'custom' && senhaCustom.trim().length < 6) {
+      setRetornoSenha({ ok: false, mensagem: 'A senha precisa ter pelo menos 6 caracteres.' });
+      return;
+    }
+    if (!window.confirm('Isso define uma senha nova para a aluna. A senha atual dela deixa de funcionar. Continuar?')) return;
+    setRetornoSenha(null);
+    setRetornoEmail(null);
+    iniciarSenha(async () => {
+      const resultado = await definirNovaSenha({
+        alunaId,
+        senha: modoSenha === 'custom' ? senhaCustom.trim() : undefined
+      });
+      if (resultado.ok && resultado.senha) {
+        setAcessoDefinido({ senha: resultado.senha, whatsappUrl: resultado.whatsappUrl ?? null });
+      } else {
+        setRetornoSenha({ ok: false, mensagem: resultado.mensagem });
+      }
     });
+  }
+
+  function copiarSenha() {
+    if (!acessoDefinido) return;
+    void navigator.clipboard?.writeText(acessoDefinido.senha);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1500);
+  }
+
+  function abrirWhatsapp() {
+    if (acessoDefinido?.whatsappUrl) window.open(acessoDefinido.whatsappUrl, '_blank', 'noopener');
+  }
+
+  function enviarEmail() {
+    if (!enviarAcessoEmail || !acessoDefinido) return;
+    setRetornoEmail(null);
+    iniciarEmail(async () => {
+      const resultado = await enviarAcessoEmail({ alunaId, senha: acessoDefinido.senha });
+      setRetornoEmail(resultado);
+    });
+  }
+
+  function novaSenha() {
+    setAcessoDefinido(null);
+    setSenhaCustom('');
+    setModoSenha('auto');
+    setRetornoSenha(null);
+    setRetornoEmail(null);
+    setCopiado(false);
   }
 
   return (
@@ -179,9 +229,69 @@ export default function AccessManager({
 
           <div className="dcard">
             <h2><Mail size={16} /> Reenviar acesso</h2>
-            <p className="dsub">Gera uma nova senha provisória de 6 dígitos e reenvia o e-mail de boas-vindas com o link de acesso. Use quando a aluna perdeu o e-mail ou não consegue entrar.</p>
-            <button className="btn-pink-sq" type="button" onClick={reenviar} disabled={reenviando || !reenviarAcesso}>{reenviando ? 'Reenviando...' : 'Reenviar e-mail com nova senha'}</button>
-            {retornoReenvio && <div className={`dmsg ${retornoReenvio.ok ? 'ok' : 'err'}`}>{retornoReenvio.mensagem}</div>}
+            <p className="dsub">Defina uma senha nova e envie por WhatsApp ou e-mail. Use quando a aluna perdeu o e-mail ou não consegue entrar.</p>
+
+            {!acessoDefinido ? (
+              <>
+                <div className="ra-seg">
+                  <button type="button" className={modoSenha === 'auto' ? 'on' : ''} onClick={() => setModoSenha('auto')}>Gerar automática</button>
+                  <button type="button" className={modoSenha === 'custom' ? 'on' : ''} onClick={() => setModoSenha('custom')}>Escolher senha</button>
+                </div>
+                {modoSenha === 'custom' && (
+                  <label className="ra-field">
+                    <span>Nova senha (mín. 6 caracteres)</span>
+                    <input value={senhaCustom} onChange={(e) => { setSenhaCustom(e.target.value); setRetornoSenha(null); }} placeholder="Ex.: Loja2026" autoComplete="off" />
+                  </label>
+                )}
+                <button className="btn-pink-sq" type="button" onClick={definirSenha} disabled={definindoSenha || !definirNovaSenha}>{definindoSenha ? 'Definindo...' : 'Definir senha'}</button>
+                {retornoSenha && <div className={`dmsg ${retornoSenha.ok ? 'ok' : 'err'}`}>{retornoSenha.mensagem}</div>}
+              </>
+            ) : (
+              <div className="ra-result">
+                <div className="ra-ok"><Check size={15} /> Senha definida — pronta pra enviar</div>
+                <div className="ra-pass">
+                  <code>{acessoDefinido.senha}</code>
+                  <button type="button" onClick={copiarSenha}><Copy size={13} /> {copiado ? 'Copiado' : 'Copiar'}</button>
+                </div>
+                <div className="ra-send">
+                  {acessoDefinido.whatsappUrl ? (
+                    <button type="button" className="ra-wpp" onClick={abrirWhatsapp}><MessageCircle size={16} /> Enviar por WhatsApp</button>
+                  ) : (
+                    <div className="ra-nowpp">Sem WhatsApp no cadastro. Salve o número na aba “Dados” pra habilitar o envio.</div>
+                  )}
+                  <button type="button" className="ra-mail" onClick={enviarEmail} disabled={enviandoEmail || !enviarAcessoEmail}><Mail size={16} /> {enviandoEmail ? 'Enviando...' : 'Enviar por e-mail'}</button>
+                </div>
+                {retornoEmail && <div className={`dmsg ${retornoEmail.ok ? 'ok' : 'err'}`}>{retornoEmail.mensagem}</div>}
+                <button type="button" className="ra-again" onClick={novaSenha}>Definir outra senha</button>
+              </div>
+            )}
+
+            <style>{`
+              .ra-seg{display:flex;gap:8px;margin:2px 0 12px}
+              .ra-seg button{flex:1;font:inherit;font-size:12.5px;font-weight:600;color:#c9c9d2;background:#1b1b1f;border:1px solid #34343a;border-radius:9px;padding:9px;cursor:pointer;transition:.15s}
+              .ra-seg button:hover{border-color:#5a5a63}
+              .ra-seg button.on{background:rgba(255,46,99,.14);border-color:#ff2e63;color:#fff}
+              .ra-field{display:grid;gap:6px;margin-bottom:12px}
+              .ra-field>span{font-size:12px;font-weight:700;color:#ddd}
+              .ra-field input{width:100%;box-sizing:border-box;background:#1b1b1f;color:#fff;border:1px solid #35353b;border-radius:9px;padding:11px 12px;outline:none;font:500 14px Archivo,Arial,sans-serif;letter-spacing:.3px}
+              .ra-field input:focus{border-color:#ff2e63;box-shadow:0 0 0 3px rgba(255,46,99,.12)}
+              .ra-result{display:grid;gap:12px}
+              .ra-ok{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#8ce3aa}
+              .ra-pass{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f0f12;border:1px solid #2b2b31;border-radius:9px;padding:10px 12px}
+              .ra-pass code{font:600 15px ui-monospace,'SFMono-Regular',Menlo,monospace;color:#fff;letter-spacing:.5px;word-break:break-all}
+              .ra-pass button{display:inline-flex;align-items:center;gap:5px;flex:none;font:inherit;font-size:12px;color:#c9c9d2;background:transparent;border:1px solid #34343a;border-radius:7px;padding:6px 10px;cursor:pointer;transition:.15s}
+              .ra-pass button:hover{border-color:#5a5a63;color:#fff}
+              .ra-send{display:flex;flex-wrap:wrap;gap:8px}
+              .ra-send button{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1;min-width:150px;font:inherit;font-size:13.5px;font-weight:700;border-radius:9px;padding:11px;cursor:pointer;transition:.15s;border:1px solid transparent}
+              .ra-send button:disabled{opacity:.55;cursor:not-allowed}
+              .ra-wpp{background:#25D366;color:#08351b}
+              .ra-wpp:hover{background:#1fbe59}
+              .ra-mail{background:transparent;color:#e6e6ea;border-color:#3a3a42 !important}
+              .ra-mail:hover{border-color:#5a5a63 !important}
+              .ra-nowpp{flex:1;min-width:150px;display:flex;align-items:center;font-size:11.5px;color:#c98aa0;line-height:1.45}
+              .ra-again{justify-self:start;background:transparent;border:none;color:#8a8a93;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+              .ra-again:hover{color:#c9c9d2}
+            `}</style>
           </div>
         </div>
       ) : (
