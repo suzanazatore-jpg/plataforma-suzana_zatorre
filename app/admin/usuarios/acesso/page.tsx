@@ -1,340 +1,82 @@
-import Link from 'next/link';
-import { User } from 'lucide-react';
-import { revalidatePath } from 'next/cache';
-import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { sendAccessEmail } from '@/lib/email/access-email';
-import AccessManager, { type CursoAcesso } from './access-manager';
-import './acesso.css';
+'use client'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
-export const dynamic = 'force-dynamic';
+const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
-type Props = {
-  searchParams?: { id?: string };
-};
+const C = { bg: '#070607', panel: '#0a080a', card: '#161213', line: '#242021', muted: '#a49a96', muted2: '#6f6763', hot: '#ff2e63' }
 
-type Resultado = { ok: boolean; mensagem: string };
+export default function AdminCursosLista() {
+  const [carregando, setCarregando] = useState(true)
+  const [autorizado, setAutorizado] = useState(false)
+  const [cursos, setCursos] = useState([])
+  const [erro, setErro] = useState('')
+  const router = useRouter()
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function academyUrl() {
-  return (process.env.ACADEMY_URL || 'https://academia.suzanazatorre.com.br').replace(/\/$/, '');
-}
-
-function primeiroNome(nome: string) {
-  return nome.trim().split(/\s+/)[0] || 'Aluna';
-}
-
-function gerarSenhaProvisoria() {
-  const randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
-  return String(100000 + (randomValue % 900000));
-}
-
-// Converte o atalho de tempo (30d/3m/6m/12m) ou uma data exata (YYYY-MM-DD)
-// numa data de vencimento ISO. Retorna null quando o prazo é inválido.
-function calcularExpiracao(tempo?: string, dataFim?: string): string | null {
-  const alvo = new Date();
-  switch ((tempo || '').trim()) {
-    case '30d': alvo.setDate(alvo.getDate() + 30); return alvo.toISOString();
-    case '3m': alvo.setMonth(alvo.getMonth() + 3); return alvo.toISOString();
-    case '6m': alvo.setMonth(alvo.getMonth() + 6); return alvo.toISOString();
-    case '12m': alvo.setFullYear(alvo.getFullYear() + 1); return alvo.toISOString();
-    case 'custom': {
-      const data = String(dataFim || '').trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return null;
-      const fim = new Date(`${data}T23:59:59`);
-      return Number.isNaN(fim.getTime()) ? null : fim.toISOString();
+  useEffect(() => {
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      if (session.user.email !== ADMIN_EMAIL) { setAutorizado(false); setCarregando(false); return }
+      setAutorizado(true)
+      const { data, error } = await supabase.from('courses')
+        .select('id, slug, title, subtitle, cover_image_url, sort_order, is_published')
+        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      if (error) setErro(error.message); else setCursos(data || [])
+      setCarregando(false)
     }
-    default: return null;
-  }
-}
+    init()
+  }, [router])
 
-async function garantirAdmin() {
-  const clienteSessao = createSupabaseServerClient();
-  const supabase = createSupabaseAdminClient();
-  if (!clienteSessao || !supabase) return null;
-  const { data } = await clienteSessao.auth.getUser();
-  const adminId = data.user?.id;
-  if (!adminId) return null;
-  const { data: perfil } = await supabase
-    .from('profiles')
-    .select('role, status')
-    .eq('id', adminId)
-    .maybeSingle();
-  if (perfil?.role !== 'admin' || perfil.status !== 'active') return null;
-  return { supabase, adminId };
-}
-
-async function salvarAcessos(alunaId: string, cursosAtivos: string[]): Promise<Resultado> {
-  'use server';
-
-  if (!UUID.test(alunaId) || cursosAtivos.some((id) => !UUID.test(id))) {
-    return { ok: false, mensagem: 'Dados de acesso inválidos.' };
-  }
-
-  const admin = await garantirAdmin();
-  if (!admin) return { ok: false, mensagem: 'Somente uma administradora conectada pode alterar acessos.' };
-  const { supabase } = admin;
-
-  const [{ data: aluna }, { data: cursos }, { data: matriculas, error }] =
-    await Promise.all([
-      supabase.from('profiles').select('id').eq('id', alunaId).maybeSingle(),
-      supabase.from('courses').select('id'),
-      supabase.from('enrollments').select('id, course_id, status').eq('profile_id', alunaId)
-    ]);
-
-  if (!aluna || error) {
-    return { ok: false, mensagem: 'Não foi possível localizar a aluna.' };
-  }
-
-  const idsCursos = new Set((cursos || []).map((curso) => curso.id));
-  if (cursosAtivos.some((id) => !idsCursos.has(id))) {
-    return { ok: false, mensagem: 'Um dos cursos selecionados não existe mais.' };
-  }
-
-  const ativos = new Set(cursosAtivos);
-  const existentes = new Map((matriculas || []).map((matricula) => [matricula.course_id, matricula]));
-
-  const operacoes: PromiseLike<unknown>[] = [];
-
-  for (const matricula of matriculas || []) {
-    const novoStatus = ativos.has(matricula.course_id) ? 'active' : 'blocked';
-    if (matricula.status !== novoStatus) {
-      operacoes.push(
-        supabase
-          .from('enrollments')
-          .update({ status: novoStatus, updated_at: new Date().toISOString() })
-          .eq('id', matricula.id)
-      );
-    }
-  }
-
-  const novas = cursosAtivos
-    .filter((courseId) => !existentes.has(courseId))
-    .map((courseId) => ({
-      profile_id: alunaId,
-      course_id: courseId,
-      status: 'active',
-      source: 'admin',
-      purchased_at: new Date().toISOString()
-    }));
-
-  if (novas.length > 0) {
-    operacoes.push(supabase.from('enrollments').insert(novas));
-  }
-
-  const resultados = await Promise.all(operacoes);
-  const falha = resultados.find(
-    (resultado) =>
-      typeof resultado === 'object' &&
-      resultado !== null &&
-      'error' in resultado &&
-      Boolean((resultado as { error?: unknown }).error)
-  );
-
-  if (falha) {
-    console.error('Erro ao salvar acessos:', falha);
-    return { ok: false, mensagem: 'O Supabase não conseguiu salvar todos os acessos.' };
-  }
-
-  revalidatePath('/admin/usuarios');
-  revalidatePath(`/admin/usuarios/acesso?id=${alunaId}`);
-  revalidatePath('/area');
-  return { ok: true, mensagem: 'Acessos salvos com sucesso.' };
-}
-
-async function salvarDadosAluna(dados: { id: string; nome: string; email: string; telefone: string }): Promise<Resultado> {
-  'use server';
-  const admin = await garantirAdmin();
-  if (!admin) return { ok: false, mensagem: 'Somente uma administradora conectada pode editar os dados.' };
-  const { supabase } = admin;
-
-  const nome = dados.nome.trim();
-  const email = dados.email.trim().toLowerCase();
-  const telefone = String(dados.telefone || '').replace(/\D/g, '');
-  if (!UUID.test(dados.id) || !nome || !/^\S+@\S+\.\S+$/.test(email)) {
-    return { ok: false, mensagem: 'Confira o nome e o e-mail informados.' };
-  }
-
-  const { error: authErro } = await supabase.auth.admin.updateUserById(dados.id, {
-    email,
-    user_metadata: { name: nome, phone: telefone || null }
-  });
-  if (authErro) return { ok: false, mensagem: 'Não foi possível atualizar o login desta aluna.' };
-
-  const { error: perfilErro } = await supabase
-    .from('profiles')
-    .update({ name: nome, email, phone: telefone || null, updated_at: new Date().toISOString() })
-    .eq('id', dados.id);
-  if (perfilErro) return { ok: false, mensagem: 'O login foi atualizado, mas os dados da lista não. Tente novamente.' };
-
-  revalidatePath('/admin/usuarios');
-  revalidatePath(`/admin/usuarios/acesso?id=${dados.id}`);
-  return { ok: true, mensagem: 'Dados atualizados com sucesso.' };
-}
-
-async function reenviarAcesso(alunaId: string): Promise<Resultado> {
-  'use server';
-  if (!UUID.test(alunaId)) return { ok: false, mensagem: 'Aluna inválida.' };
-  const admin = await garantirAdmin();
-  if (!admin) return { ok: false, mensagem: 'Somente uma administradora conectada pode reenviar o acesso.' };
-  const { supabase } = admin;
-
-  const { data: aluna } = await supabase
-    .from('profiles')
-    .select('id, name, email, phone')
-    .eq('id', alunaId)
-    .maybeSingle();
-  if (!aluna?.email) return { ok: false, mensagem: 'Aluna não encontrada.' };
-
-  const senhaProvisoria = gerarSenhaProvisoria();
-  const { error: senhaErro } = await supabase.auth.admin.updateUserById(alunaId, { password: senhaProvisoria });
-  if (senhaErro) return { ok: false, mensagem: 'Não foi possível gerar uma nova senha. Tente novamente.' };
-
-  const envio = await sendAccessEmail({
-    email: aluna.email,
-    name: aluna.name || null,
-    tempPassword: senhaProvisoria,
-    courseName: null
-  });
-  if (!envio.ok) return { ok: false, mensagem: 'A senha foi trocada, mas o e-mail não pôde ser enviado.' };
-
-  return { ok: true, mensagem: 'E-mail reenviado com uma nova senha provisória.' };
-}
-
-async function definirPrazo(dados: { alunaId: string; cursoId: string; tempo: string; dataFim?: string }): Promise<Resultado> {
-  'use server';
-  if (!UUID.test(dados.alunaId) || !UUID.test(dados.cursoId)) return { ok: false, mensagem: 'Dados inválidos.' };
-  const admin = await garantirAdmin();
-  if (!admin) return { ok: false, mensagem: 'Somente uma administradora conectada pode alterar o prazo.' };
-  const { supabase } = admin;
-
-  const expiracao = calcularExpiracao(dados.tempo, dados.dataFim);
-  if (!expiracao) return { ok: false, mensagem: 'Escolha um prazo válido.' };
-
-  const { data: matricula } = await supabase
-    .from('enrollments')
-    .select('id')
-    .eq('profile_id', dados.alunaId)
-    .eq('course_id', dados.cursoId)
-    .maybeSingle();
-  if (!matricula) return { ok: false, mensagem: 'Libere o curso antes de definir o prazo.' };
-
-  const { error } = await supabase
-    .from('enrollments')
-    .update({ status: 'active', expires_at: expiracao, updated_at: new Date().toISOString() })
-    .eq('id', matricula.id);
-  if (error) return { ok: false, mensagem: 'Não foi possível salvar o novo prazo.' };
-
-  revalidatePath('/admin/usuarios');
-  revalidatePath(`/admin/usuarios/acesso?id=${dados.alunaId}`);
-  revalidatePath('/area');
-  const label = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza' }).format(new Date(expiracao));
-  return { ok: true, mensagem: `Acesso liberado até ${label}.` };
-}
-
-export default async function AcessoCursosPage({ searchParams }: Props) {
-  const alunaId = searchParams?.id || '';
-  const supabase = createSupabaseAdminClient();
-
-  if (!UUID.test(alunaId)) {
-    return (
-      <div className="pad">
-        <div className="ac-note">Selecione uma aluna na lista de usuários.</div>
-        <Link className="btn-pink-sq" href="/admin/usuarios">
-          Voltar para usuários
-        </Link>
-      </div>
-    );
-  }
-
-  if (!supabase) {
-    return <div className="pad">A conexão com o Supabase não está configurada.</div>;
-  }
-
-  const [perfilResultado, cursosResultado, matriculasResultado] =
-    await Promise.all([
-      supabase.from('profiles').select('id, name, email, phone').eq('id', alunaId).maybeSingle(),
-      supabase
-        .from('courses')
-        .select('id, title, subtitle, cover_image_url, sort_order, is_published')
-        .order('sort_order', { ascending: true }),
-      supabase.from('enrollments').select('course_id, status, expires_at').eq('profile_id', alunaId)
-    ]);
-
-  const aluna = perfilResultado.data;
-  if (!aluna) {
-    return <div className="pad">Aluna não encontrada.</div>;
-  }
-
-  const agora = Date.now();
-  const matriculaPorCurso = new Map((matriculasResultado.data || []).map((m) => [m.course_id, m]));
-  const estaAtiva = (m?: { status: string; expires_at: string | null }) =>
-    !!m && m.status === 'active' && (!m.expires_at || new Date(m.expires_at).getTime() >= agora);
-
-  const cursos: CursoAcesso[] = (cursosResultado.data || []).map((curso) => {
-    const m = matriculaPorCurso.get(curso.id);
-    return {
-      id: curso.id,
-      titulo: curso.title,
-      subtitulo: curso.subtitle || '',
-      capa: curso.cover_image_url,
-      ativo: estaAtiva(m),
-      expiresAt: m?.expires_at || null
-    };
-  });
-  const liberados = cursos.filter((curso) => curso.ativo).length;
-
-  const vencimentos = (matriculasResultado.data || [])
-    .filter((m) => m.status === 'active' && m.expires_at)
-    .map((m) => new Date(m.expires_at as string).getTime())
-    .sort((a, b) => a - b);
-  const proximo = vencimentos[0] || null;
-  let badge: { tom: string; texto: string } | null = null;
-  if (proximo) {
-    const dias = Math.ceil((proximo - agora) / (24 * 60 * 60 * 1000));
-    if (dias < 0) badge = { tom: 'exp', texto: 'Acesso vencido' };
-    else if (dias <= 30) badge = { tom: 'warn', texto: `Vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}` };
-    else badge = { tom: 'ok', texto: 'Acesso ativo' };
-  } else if (liberados > 0) {
-    badge = { tom: 'ok', texto: 'Acesso ativo' };
-  }
+  if (carregando) return <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: C.muted2 }}>Carregando...</p></div>
+  if (!autorizado) return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, textAlign: 'center' }}>
+      <div style={{ fontSize: 44, marginBottom: 14 }}>🔒</div>
+      <h1 style={{ color: '#fff', fontSize: 20, margin: '0 0 8px' }}>Acesso restrito</h1>
+      <button onClick={() => router.push('/painel')} style={{ background: C.hot, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>Voltar ao painel</button>
+    </div>
+  )
 
   return (
-    <>
-      <div className="crumb">
-        ⚙ Administrador ›{' '}
-        <Link href="/admin/usuarios" style={{ color: 'inherit', textDecoration: 'underline' }}>
-          Usuários
-        </Link>{' '}
-        › {aluna.name || 'Aluna'}
-      </div>
-
-      <div className="pad">
-        <div className="stu-head">
-          <span className="ava"><User size={26} /></span>
+    <div style={{ minHeight: '100vh', background: C.bg, color: '#fff', fontFamily: 'Archivo, system-ui, sans-serif' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '16px 20px', borderBottom: `1px solid ${C.line}`, background: C.panel, position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button onClick={() => router.push('/admin/cursos')} style={{ background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, color: C.hot, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>← Cursos</button>
           <div>
-            <h1>{aluna.name || 'Aluna sem nome'}</h1>
-            <small>{aluna.email}</small>
-            {badge && <div><span className={`stu-badge ${badge.tom}`}>{badge.texto}</span></div>}
-          </div>
-          <div className="st">
-            Cursos liberados
-            <b>{liberados} de {cursos.length}</b>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: C.hot, textTransform: 'uppercase', margin: 0 }}>Cursos e Aulas</p>
+            <p style={{ fontSize: 15, fontWeight: 800, margin: '1px 0 0' }}>Todos os cursos</p>
           </div>
         </div>
+        <button onClick={() => router.push('/admin/cursos/editar')} style={{ background: C.hot, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋ Novo curso</button>
+      </header>
 
-        <AccessManager
-          alunaId={aluna.id}
-          alunaNome={aluna.name || 'esta aluna'}
-          cursos={cursos}
-          salvarAcessos={salvarAcessos}
-          dados={{ nome: aluna.name || '', email: aluna.email || '', telefone: aluna.phone || '' }}
-          salvarDados={salvarDadosAluna}
-          reenviarAcesso={reenviarAcesso}
-          definirPrazo={definirPrazo}
-        />
-      </div>
-    </>
-  );
+      <main style={{ maxWidth: 820, margin: '0 auto', padding: '24px 18px 60px' }}>
+        {erro && <div style={{ background: '#2a1515', border: '1px solid #5a2a2a', color: '#f5a5a5', borderRadius: 10, padding: '12px 14px', fontSize: 13, marginBottom: 16 }}>{erro}</div>}
+        {cursos.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: C.muted2 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
+            <p style={{ fontSize: 15, margin: '0 0 6px', color: '#fff' }}>Nenhum curso ainda</p>
+            <p style={{ fontSize: 13, margin: 0 }}>Clique em “＋ Novo curso” para criar o primeiro.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ fontSize: 14, color: C.muted2, margin: '0 0 4px' }}>{cursos.length} curso(s) • toque para editar</p>
+            {cursos.map(curso => (
+              <div key={curso.id} onClick={() => router.push(`/admin/cursos/editar?id=${curso.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 14, background: C.card, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.hot}`, borderRadius: 12, padding: '12px 14px', cursor: 'pointer' }}>
+                <div style={{ width: 64, height: 48, borderRadius: 8, background: '#221a1c', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {curso.cover_image_url ? <img src={curso.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 20 }}>🎬</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 2px', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{curso.title}</h3>
+                  <p style={{ fontSize: 12, margin: 0, color: C.muted2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>/{curso.slug}{curso.subtitle ? ` • ${curso.subtitle}` : ''}</p>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 999, flexShrink: 0, background: curso.is_published ? 'rgba(255,46,99,0.15)' : '#1b1617', color: curso.is_published ? C.hot : C.muted2, border: `1px solid ${curso.is_published ? 'rgba(255,46,99,0.35)' : C.line}` }}>{curso.is_published ? 'Publicado' : 'Rascunho'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
 }
