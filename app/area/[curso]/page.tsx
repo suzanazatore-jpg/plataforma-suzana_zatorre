@@ -209,6 +209,8 @@ export default async function CoursePage({
     if (!enrollment) redirect('/acesso-negado');
   }
 
+  const initial = student.displayName.charAt(0).toUpperCase();
+
   const { data: modules } = await admin
     .from('modules')
     .select('id,title,sort_order,lessons(id,title,slug,description,video_url,thumbnail_url,duration_label,sort_order,is_published)')
@@ -222,7 +224,59 @@ export default async function CoursePage({
       .filter((lesson: any) => lesson.is_published)
       .map((lesson: any) => ({ ...lesson, moduleTitle: module.title }))
   );
-  if (!lessons.length) redirect('/area');
+
+  // Materiais ligados ao curso (sem aula específica). São os "extras" mostrados
+  // no menu lateral da visão de aulas — e também o conteúdo principal quando o
+  // produto é só de PDF (sem nenhuma aula).
+  const { data: extraRows } = await admin
+    .from('materials')
+    .select('id,title,file_url,sort_order')
+    .eq('course_id', course.id)
+    .is('lesson_id', null)
+    .eq('is_published', true)
+    .order('sort_order');
+  const extras = (extraRows || []).map((material: any) => ({
+    ...material,
+    url: `/api/materials/${material.id}/download`
+  }));
+
+  // Produto só de material (sem aulas): em vez de redirecionar pra /area (o que
+  // fazia a tela "não abrir nada"), mostramos uma página simples com os PDFs pra
+  // download. Só voltamos pra área se não houver nem aula nem material.
+  if (!lessons.length) {
+    if (!extras.length) redirect('/area');
+
+    return (
+      <div className="ep-page">
+        <header className="ep-bar">
+          <Link className="ep-back" href="/area" aria-label="Voltar para meus cursos"><ArrowLeft size={16} /></Link>
+          <img className="ep-logo" src="/brand/logo-dark.png" alt="Academia de Vendas Suzana Zatorre" />
+          <div className="ep-title"><small>Material de apoio</small><h1>{course.title}</h1></div>
+          <div className="ep-who"><span>Olá, {student.displayName}</span><span className="ep-avatar">{initial}</span></div>
+        </header>
+
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '30px 20px 0' }}>
+          {course.description ? (
+            <p style={{ color: '#c9bfbb', fontSize: 15, lineHeight: 1.6, margin: '0 0 22px', maxWidth: 640 }}>
+              {course.description}
+            </p>
+          ) : null}
+
+          <div className="ep-side-card ep-materials-panel" style={{ marginTop: 0 }}>
+            <div className="ep-side-head">
+              <span className="ep-chk"><Download size={16} /></span>
+              Arquivos para download
+            </div>
+            <div className="ep-mlist ep-mlist-panel">
+              {extras.map((material: any) => (
+                <MaterialDownload href={material.url} title={material.title} key={material.id} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const lessonIds = lessons.map((lesson: any) => lesson.id);
   const { data: progressRows } = await session
@@ -251,17 +305,6 @@ export default async function CoursePage({
     url: `/api/materials/${material.id}/download`
   }));
 
-  const { data: extraRows } = await admin
-    .from('materials')
-    .select('id,title,file_url,sort_order')
-    .eq('course_id', course.id)
-    .is('lesson_id', null)
-    .eq('is_published', true)
-    .order('sort_order');
-  const extras = (extraRows || []).map((material: any) => ({
-    ...material,
-    url: `/api/materials/${material.id}/download`
-  }));
   const { data: commentRows } = await admin
     .from('lesson_comments')
     .select('id,body,created_at,profile_id,parent_id,is_admin_reply')
@@ -289,7 +332,6 @@ export default async function CoursePage({
     : rootComments.filter((comment: any) => comment.profile_id === student.userId);
   const enviado = searchParams?.enviado === '1';
   const activeTab = searchParams?.tab === 'comentarios' ? 'comentarios' : 'descricao';
-  const initial = student.displayName.charAt(0).toUpperCase();
 
   const commentsPanel = (
     <section style={{ padding: '4px 0 2px' }}>
