@@ -26,6 +26,7 @@ type Props = {
   salvarDados?: (dados: { id: string; nome: string; email: string; telefone: string }) => Promise<Resultado>;
   definirNovaSenha?: (dados: { alunaId: string; senha?: string }) => Promise<ResultadoSenha>;
   enviarAcessoEmail?: (dados: { alunaId: string; senha: string }) => Promise<Resultado>;
+  enviarAcessoWhatsapp?: (dados: { alunaId: string; senha: string }) => Promise<Resultado>;
   definirPrazo?: (dados: { alunaId: string; cursoId: string; tempo: string; dataFim?: string }) => Promise<Resultado>;
 };
 
@@ -51,6 +52,7 @@ export default function AccessManager({
   salvarDados,
   definirNovaSenha,
   enviarAcessoEmail,
+  enviarAcessoWhatsapp,
   definirPrazo
 }: Props) {
   const router = useRouter();
@@ -86,6 +88,8 @@ export default function AccessManager({
   const [definindoSenha, iniciarSenha] = useTransition();
   const [retornoEmail, setRetornoEmail] = useState<Resultado | null>(null);
   const [enviandoEmail, iniciarEmail] = useTransition();
+  const [retornoWpp, setRetornoWpp] = useState<Resultado | null>(null);
+  const [enviandoWpp, iniciarWpp] = useTransition();
 
   function alternarCurso(cursoId: string) {
     setRetornoAcesso(null);
@@ -166,6 +170,7 @@ export default function AccessManager({
     if (!window.confirm('Isso define uma senha nova para a aluna. A senha atual dela deixa de funcionar. Continuar?')) return;
     setRetornoSenha(null);
     setRetornoEmail(null);
+    setRetornoWpp(null);
     iniciarSenha(async () => {
       const resultado = await definirNovaSenha({
         alunaId,
@@ -184,6 +189,15 @@ export default function AccessManager({
     void navigator.clipboard?.writeText(acessoDefinido.senha);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 1500);
+  }
+
+  function enviarWhatsappAuto() {
+    if (!enviarAcessoWhatsapp || !acessoDefinido) return;
+    setRetornoWpp(null);
+    iniciarWpp(async () => {
+      const resultado = await enviarAcessoWhatsapp({ alunaId, senha: acessoDefinido.senha });
+      setRetornoWpp(resultado);
+    });
   }
 
   function abrirWhatsapp() {
@@ -205,6 +219,7 @@ export default function AccessManager({
     setModoSenha('auto');
     setRetornoSenha(null);
     setRetornoEmail(null);
+    setRetornoWpp(null);
     setCopiado(false);
   }
 
@@ -253,14 +268,29 @@ export default function AccessManager({
                   <code>{acessoDefinido.senha}</code>
                   <button type="button" onClick={copiarSenha}><Copy size={13} /> {copiado ? 'Copiado' : 'Copiar'}</button>
                 </div>
-                <div className="ra-send">
-                  {acessoDefinido.whatsappUrl ? (
-                    <button type="button" className="ra-wpp" onClick={abrirWhatsapp}><MessageCircle size={16} /> Enviar por WhatsApp</button>
-                  ) : (
+
+                {acessoDefinido.whatsappUrl ? (
+                  <>
+                    <div className="ra-send">
+                      <button type="button" className="ra-wpp" onClick={enviarWhatsappAuto} disabled={enviandoWpp || !enviarAcessoWhatsapp}>
+                        <MessageCircle size={16} /> {enviandoWpp ? 'Enviando...' : 'Enviar por WhatsApp'}
+                      </button>
+                      <button type="button" className="ra-mail" onClick={enviarEmail} disabled={enviandoEmail || !enviarAcessoEmail}>
+                        <Mail size={16} /> {enviandoEmail ? 'Enviando...' : 'Enviar por e-mail'}
+                      </button>
+                    </div>
+                    <button type="button" className="ra-wpp-alt" onClick={abrirWhatsapp}>ou abrir no meu WhatsApp</button>
+                  </>
+                ) : (
+                  <div className="ra-send">
                     <div className="ra-nowpp">Sem WhatsApp no cadastro. Salve o número na aba “Dados” pra habilitar o envio.</div>
-                  )}
-                  <button type="button" className="ra-mail" onClick={enviarEmail} disabled={enviandoEmail || !enviarAcessoEmail}><Mail size={16} /> {enviandoEmail ? 'Enviando...' : 'Enviar por e-mail'}</button>
-                </div>
+                    <button type="button" className="ra-mail" onClick={enviarEmail} disabled={enviandoEmail || !enviarAcessoEmail}>
+                      <Mail size={16} /> {enviandoEmail ? 'Enviando...' : 'Enviar por e-mail'}
+                    </button>
+                  </div>
+                )}
+
+                {retornoWpp && <div className={`dmsg ${retornoWpp.ok ? 'ok' : 'err'}`}>{retornoWpp.mensagem}</div>}
                 {retornoEmail && <div className={`dmsg ${retornoEmail.ok ? 'ok' : 'err'}`}>{retornoEmail.mensagem}</div>}
                 <button type="button" className="ra-again" onClick={novaSenha}>Definir outra senha</button>
               </div>
@@ -288,6 +318,8 @@ export default function AccessManager({
               .ra-wpp:hover{background:#1fbe59}
               .ra-mail{background:transparent;color:#e6e6ea;border-color:#3a3a42 !important}
               .ra-mail:hover{border-color:#5a5a63 !important}
+              .ra-wpp-alt{justify-self:start;background:transparent;border:none;color:#8a8a93;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-top:-4px}
+              .ra-wpp-alt:hover{color:#c9c9d2}
               .ra-nowpp{flex:1;min-width:150px;display:flex;align-items:center;font-size:11.5px;color:#c98aa0;line-height:1.45}
               .ra-again{justify-self:start;background:transparent;border:none;color:#8a8a93;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
               .ra-again:hover{color:#c9c9d2}
