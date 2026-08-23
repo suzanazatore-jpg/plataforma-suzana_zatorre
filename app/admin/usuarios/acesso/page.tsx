@@ -44,6 +44,14 @@ function normalizarWhatsapp(phone?: string | null): string | null {
   return digitos;
 }
 
+// Telefone sem o DDI 55 (útil pro BotConversa, que às vezes prepara o 55 sozinho).
+function telefoneNacional(phone?: string | null): string | null {
+  const digitos = String(phone || '').replace(/\D/g, '');
+  if (!digitos) return null;
+  if (digitos.startsWith('55') && digitos.length >= 12) return digitos.slice(2);
+  return digitos;
+}
+
 // Monta o link wa.me já com a mensagem de acesso pronta. Retorna null se não houver telefone.
 function montarWhatsappUrl(phone: string | null | undefined, opcoes: { nome: string | null; email: string; senha: string }): string | null {
   const numero = normalizarWhatsapp(phone);
@@ -202,8 +210,8 @@ async function salvarDadosAluna(dados: { id: string; nome: string; email: string
 }
 
 // Define uma senha nova (gerada ou escolhida pela admin) e devolve a senha em texto
-// junto com um link de WhatsApp pronto pra enviar. NÃO dispara e-mail — isso fica
-// a cargo de enviarAcessoEmail, pra admin escolher o canal.
+// junto com um link de WhatsApp pronto pra enviar. NÃO dispara e-mail nem WhatsApp
+// automático — isso fica a cargo de enviarAcessoEmail / enviarAcessoWhatsapp.
 async function definirNovaSenha(dados: { alunaId: string; senha?: string }): Promise<ResultadoSenha> {
   'use server';
   if (!UUID.test(dados.alunaId)) return { ok: false, mensagem: 'Aluna inválida.' };
@@ -262,6 +270,63 @@ async function enviarAcessoEmail(dados: { alunaId: string; senha: string }): Pro
   if (!envio.ok) return { ok: false, mensagem: 'Não foi possível enviar o e-mail agora. Tente de novo em instantes.' };
 
   return { ok: true, mensagem: `E-mail enviado para ${aluna.email}.` };
+}
+
+// Dispara o WhatsApp automático pela via exclusiva de reenvio de senha
+// (Pabbly -> BotConversa). Usa a variável PABBLY_PASSWORD_RESET_WEBHOOK_URL,
+// separada da automação de compras. Reafirma a senha antes de mandar.
+async function enviarAcessoWhatsapp(dados: { alunaId: string; senha: string }): Promise<Resultado> {
+  'use server';
+  if (!UUID.test(dados.alunaId)) return { ok: false, mensagem: 'Aluna inválida.' };
+  const admin = await garantirAdmin();
+  if (!admin) return { ok: false, mensagem: 'Somente uma administradora conectada pode enviar o WhatsApp.' };
+  const { supabase } = admin;
+
+  const senha = String(dados.senha || '').trim();
+  if (senha.length < 6) return { ok: false, mensagem: 'Defina a senha antes de enviar o WhatsApp.' };
+
+  const { data: aluna } = await supabase
+    .from('profiles')
+    .select('name, email, phone')
+    .eq('id', dados.alunaId)
+    .maybeSingle();
+  if (!aluna?.email) return { ok: false, mensagem: 'Aluna não encontrada.' };
+
+  const numero = normalizarWhatsapp(aluna.phone);
+  if (!numero) return { ok: false, mensagem: 'Esta aluna não tem WhatsApp no cadastro. Salve o número na aba “Dados”.' };
+
+  const webhookUrl = process.env.PABBLY_PASSWORD_RESET_WEBHOOK_URL?.trim();
+  if (!webhookUrl) {
+    return { ok: false, mensagem: 'A automação de WhatsApp ainda não está ligada. Use “abrir no meu WhatsApp” por enquanto.' };
+  }
+
+  const { error: senhaErro } = await supabase.auth.admin.updateUserById(dados.alunaId, { password: senha });
+  if (senhaErro) return { ok: false, mensagem: 'Não foi possível confirmar a senha para o envio.' };
+
+  try {
+    const resposta = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        event: 'academy_password_reset',
+        first_name: primeiroNome(aluna.name || ''),
+        full_name: aluna.name,
+        email: aluna.email,
+        phone: numero,
+        phone_national: telefoneNacional(aluna.phone),
+        new_password: senha,
+        login_url: plataformaUrl()
+      }),
+      cache: 'no-store'
+    });
+    if (!resposta.ok) {
+      return { ok: false, mensagem: 'Não consegui disparar o WhatsApp automático agora. Tente “abrir no meu WhatsApp”.' };
+    }
+  } catch {
+    return { ok: false, mensagem: 'Não consegui falar com a automação do WhatsApp. Tente “abrir no meu WhatsApp”.' };
+  }
+
+  return { ok: true, mensagem: 'Mensagem enviada pelo WhatsApp ✅' };
 }
 
 async function definirPrazo(dados: { alunaId: string; cursoId: string; tempo: string; dataFim?: string }): Promise<Resultado> {
@@ -395,6 +460,7 @@ export default async function AcessoCursosPage({ searchParams }: Props) {
           salvarDados={salvarDadosAluna}
           definirNovaSenha={definirNovaSenha}
           enviarAcessoEmail={enviarAcessoEmail}
+          enviarAcessoWhatsapp={enviarAcessoWhatsapp}
           definirPrazo={definirPrazo}
         />
       </div>
