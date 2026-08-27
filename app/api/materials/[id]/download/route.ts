@@ -96,6 +96,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (!enrollment) return new NextResponse('Você não tem acesso a este material.', { status: 403 });
   }
 
+  // Links do Google Planilhas são materiais interativos: devem abrir no
+  // navegador (inclusive a tela /copy), e não ser baixados como PDF.
+  if (/^https:\/\/docs\.google\.com\/spreadsheets\//i.test(material.file_url)) {
+    return NextResponse.redirect(material.file_url, 302);
+  }
+
   let fileResponse: Response;
   if (material.file_url.startsWith('storage://')) {
     const match = material.file_url.match(/^storage:\/\/([^/]+)\/(.+)$/);
