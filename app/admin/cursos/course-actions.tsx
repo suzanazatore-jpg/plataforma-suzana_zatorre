@@ -391,18 +391,20 @@ export function AulaActions({ courseId, moduleId, aula, salvar, apagar, mover, s
 type MaterialModalProps = {
   courseId: string;
   lessonId: string | null;
-  salvar: (d: { courseId: string; lessonId: string | null; title: string; fileUrl: string }) => Promise<Resultado>;
+  salvar: (d: { id?: string; courseId: string; lessonId: string | null; title: string; fileUrl: string; oldFileUrl?: string }) => Promise<Resultado>;
+  material?: { id: string; title: string; file_url?: string };
   onStage?: (m: MaterialPendente) => void;
   onClose: () => void;
 };
 
-function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: MaterialModalProps) {
+function MaterialModal({ courseId, lessonId, salvar, material, onStage, onClose }: MaterialModalProps) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<'pdf' | 'link'>('pdf');
-  const [title, setTitle] = useState('');
+  const isExistingLink = Boolean(material?.file_url && !material.file_url.startsWith('storage://'));
+  const [mode, setMode] = useState<'pdf' | 'link'>(isExistingLink ? 'link' : 'pdf');
+  const [title, setTitle] = useState(material?.title || '');
   const [file, setFile] = useState<File | null>(null);
-  const [link, setLink] = useState('');
+  const [link, setLink] = useState(isExistingLink ? material?.file_url || '' : '');
   const [hot, setHot] = useState(false);
   const [busy, setBusy] = useState(false);
   useEscClose(onClose);
@@ -437,9 +439,16 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
       if (mode === 'link') {
         const url = link.trim();
         if (!url) { window.alert('Cole o link do material.'); return; }
-        const r = await salvar({ courseId, lessonId, title: nome, fileUrl: url });
+        const r = await salvar({ id: material?.id, courseId, lessonId, title: nome, fileUrl: url, oldFileUrl: material?.file_url });
         if (!r.ok) { window.alert(r.mensagem); return; }
       } else {
+        if (!file && material?.file_url) {
+          const r = await salvar({ id: material.id, courseId, lessonId, title: nome, fileUrl: material.file_url, oldFileUrl: material.file_url });
+          if (!r.ok) { window.alert(r.mensagem); return; }
+          onClose();
+          router.refresh();
+          return;
+        }
         if (!file) { window.alert('Escolha um arquivo PDF, Excel ou CSV do computador.'); return; }
         const supabase = createClient();
         if (!supabase) { window.alert('Supabase não configurado.'); return; }
@@ -447,7 +456,7 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
         const path = `${courseId}/${lessonId || 'extras'}/${Date.now()}-${safe}`;
         const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
         if (error) { window.alert(`Não foi possível subir o arquivo: ${error.message}`); return; }
-        const r = await salvar({ courseId, lessonId, title: nome, fileUrl: `storage://course-materials/${path}` });
+        const r = await salvar({ id: material?.id, courseId, lessonId, title: nome, fileUrl: `storage://course-materials/${path}`, oldFileUrl: material?.file_url });
         if (!r.ok) { window.alert(r.mensagem); return; }
       }
       onClose();
@@ -461,7 +470,7 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
       <div className="sza-modal sza-sm" role="dialog" aria-modal="true">
         <div className="sza-head">
           <div>
-            <h2>Adicionar material</h2>
+            <h2>{material ? 'Editar material' : 'Adicionar material'}</h2>
             <p>{lessonId ? 'Fica disponível para download nesta aula.' : 'Material extra do curso, para download.'}</p>
           </div>
           <button className="sza-x" onClick={onClose} aria-label="Fechar">✕</button>
@@ -487,8 +496,8 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
                 onDragLeave={() => setHot(false)}
                 onDrop={(e) => { e.preventDefault(); setHot(false); escolher(e.dataTransfer.files?.[0]); }}>
                 <div className="u">⬆️</div>
-                <div className="t">{file ? file.name : 'Arraste o PDF aqui'}</div>
-                <div className="s">{file ? 'Clique para trocar' : 'ou clique para escolher — só PDF, até 20 MB'}</div>
+                <div className="t">{file ? file.name : (material?.file_url ? 'Arquivo atual mantido' : 'Arraste o arquivo aqui')}</div>
+                <div className="s">{file ? 'Clique para trocar' : (material?.file_url ? 'Clique para substituir — PDF, Excel ou CSV' : 'ou clique para escolher — PDF, Excel ou CSV, até 20 MB')}</div>
               </div>
             </>
           ) : (
@@ -499,7 +508,7 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
         </div>
         <div className="sza-foot">
           <button className="sza-btn sza-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
-          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Enviando…' : 'Adicionar material'}</button>
+          <button className="sza-btn sza-pink" onClick={enviar} disabled={busy}>{busy ? 'Salvando…' : (material ? 'Salvar alterações' : 'Adicionar material')}</button>
         </div>
       </div>
     </div>
@@ -511,6 +520,19 @@ export function MaterialButton({ courseId, lessonId, salvar, label = 'Material',
   return <>
     <button className="btn-ghost" onClick={() => setOpen(true)}><Upload size={14} /> {label}</button>
     {open && <MaterialModal courseId={courseId} lessonId={lessonId} salvar={salvar} onStage={onStage} onClose={() => setOpen(false)} />}
+  </>;
+}
+
+export function MaterialEditButton({ courseId, lessonId, material, salvar }: {
+  courseId: string;
+  lessonId: string | null;
+  material: { id: string; title: string; file_url?: string };
+  salvar: (d: { id?: string; courseId: string; lessonId: string | null; title: string; fileUrl: string; oldFileUrl?: string }) => Promise<Resultado>;
+}) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <span className="iconbtn" title="Editar material" onClick={() => setOpen(true)}><Pencil size={14} /></span>
+    {open && <MaterialModal courseId={courseId} lessonId={lessonId} material={material} salvar={salvar} onClose={() => setOpen(false)} />}
   </>;
 }
 
