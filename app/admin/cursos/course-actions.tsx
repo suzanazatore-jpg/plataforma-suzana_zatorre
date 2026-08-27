@@ -217,7 +217,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
                 if (!supabase) { falhas.push(m.title); continue; }
                 const safe = m.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
                 const path = `${courseId}/${novoId}/${Date.now()}-${safe}`;
-                const up = await supabase.storage.from('course-materials').upload(path, m.file, { contentType: m.file?.type || file?.type || 'application/octet-stream', upsert: false });
+                const up = await supabase.storage.from('course-materials').upload(path, m.file, { contentType: m.file.type || 'application/octet-stream', upsert: false });
                 if (up.error) { falhas.push(m.title); continue; }
                 fileUrl = `storage://course-materials/${path}`;
               }
@@ -445,7 +445,7 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
         if (!supabase) { window.alert('Supabase não configurado.'); return; }
         const safe = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
         const path = `${courseId}/${lessonId || 'extras'}/${Date.now()}-${safe}`;
-        const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: m.file?.type || file?.type || 'application/octet-stream', upsert: false });
+        const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
         if (error) { window.alert(`Não foi possível subir o arquivo: ${error.message}`); return; }
         const r = await salvar({ courseId, lessonId, title: nome, fileUrl: `storage://course-materials/${path}` });
         if (!r.ok) { window.alert(r.mensagem); return; }
