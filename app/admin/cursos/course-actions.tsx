@@ -217,7 +217,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
                 if (!supabase) { falhas.push(m.title); continue; }
                 const safe = m.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
                 const path = `${courseId}/${novoId}/${Date.now()}-${safe}`;
-                const up = await supabase.storage.from('course-materials').upload(path, m.file, { contentType: 'application/pdf', upsert: false });
+                const up = await supabase.storage.from('course-materials').upload(path, m.file, { contentType: m.file?.type || file?.type || 'application/octet-stream', upsert: false });
                 if (up.error) { falhas.push(m.title); continue; }
                 fileUrl = `storage://course-materials/${path}`;
               }
@@ -303,7 +303,7 @@ function AulaModal({ courseId, moduleId, aula, salvar, salvarMaterial, apagarMat
               {!aula ? (
                 salvarMaterial ? (
                   <div className="sza-f" style={{ marginBottom: 0 }}>
-                    <label>Materiais de apoio<span className="hint">PDF ou link — sobem junto quando você cadastrar a aula</span></label>
+                    <label>Materiais de apoio<span className="hint">PDF, Excel, CSV ou link — sobem junto quando você cadastrar a aula</span></label>
                     {pendentes.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                         {pendentes.map((m) => (
@@ -409,10 +409,11 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
 
   function escolher(f?: File) {
     if (!f) return;
-    if (f.type !== 'application/pdf') { window.alert('Escolha um arquivo PDF.'); return; }
-    if (f.size > 20 * 1024 * 1024) { window.alert('O PDF deve ter no máximo 20 MB.'); return; }
+    const extensaoValida = /\.(pdf|xlsx|xls|csv)$/i.test(f.name);
+    if (!extensaoValida) { window.alert('Escolha um arquivo PDF, Excel ou CSV.'); return; }
+    if (f.size > 20 * 1024 * 1024) { window.alert('O arquivo deve ter no máximo 20 MB.'); return; }
     setFile(f);
-    if (!title.trim()) setTitle(f.name.replace(/\.pdf$/i, ''));
+    if (!title.trim()) setTitle(f.name.replace(/\.(pdf|xlsx|xls|csv)$/i, ''));
   }
 
   async function enviar() {
@@ -425,7 +426,7 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
         if (!url) { window.alert('Cole o link do material.'); return; }
         onStage({ id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: nome, mode: 'link', link: url });
       } else {
-        if (!file) { window.alert('Escolha um PDF do computador.'); return; }
+        if (!file) { window.alert('Escolha um arquivo PDF, Excel ou CSV do computador.'); return; }
         onStage({ id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: nome, mode: 'pdf', file });
       }
       onClose();
@@ -439,13 +440,13 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
         const r = await salvar({ courseId, lessonId, title: nome, fileUrl: url });
         if (!r.ok) { window.alert(r.mensagem); return; }
       } else {
-        if (!file) { window.alert('Escolha um PDF do computador.'); return; }
+        if (!file) { window.alert('Escolha um arquivo PDF, Excel ou CSV do computador.'); return; }
         const supabase = createClient();
         if (!supabase) { window.alert('Supabase não configurado.'); return; }
         const safe = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
         const path = `${courseId}/${lessonId || 'extras'}/${Date.now()}-${safe}`;
-        const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: 'application/pdf', upsert: false });
-        if (error) { window.alert(`Não foi possível subir o PDF: ${error.message}`); return; }
+        const { error } = await supabase.storage.from('course-materials').upload(path, file, { contentType: m.file?.type || file?.type || 'application/octet-stream', upsert: false });
+        if (error) { window.alert(`Não foi possível subir o arquivo: ${error.message}`); return; }
         const r = await salvar({ courseId, lessonId, title: nome, fileUrl: `storage://course-materials/${path}` });
         if (!r.ok) { window.alert(r.mensagem); return; }
       }
@@ -473,13 +474,13 @@ function MaterialModal({ courseId, lessonId, salvar, onStage, onClose }: Materia
           <div className="sza-f">
             <label>Como você quer adicionar?</label>
             <div className="sza-seg">
-              <div className={`o ${mode === 'pdf' ? 'on' : ''}`} onClick={() => setMode('pdf')}>Subir PDF do computador</div>
+              <div className={`o ${mode === 'pdf' ? 'on' : ''}`} onClick={() => setMode('pdf')}>Subir arquivo do computador</div>
               <div className={`o ${mode === 'link' ? 'on' : ''}`} onClick={() => setMode('link')}>Usar um link</div>
             </div>
           </div>
           {mode === 'pdf' ? (
             <>
-              <input ref={input} type="file" accept=".pdf,application/pdf" hidden onChange={(e) => escolher(e.target.files?.[0])} />
+              <input ref={input} type="file" accept=".pdf,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onChange={(e) => escolher(e.target.files?.[0])} />
               <div className={`sza-drop ${hot ? 'hot' : ''}`}
                 onClick={() => input.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setHot(true); }}
