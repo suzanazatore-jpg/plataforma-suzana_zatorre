@@ -6,13 +6,46 @@ export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
 
-function safeFileName(title: string, source: string) {
+function safeFileName(title: string, source: string, detectedExtension?: string) {
   const sourceName = source.split('/').pop()?.split('?')[0] || '';
-  const sourceExtension = sourceName.match(/\.[a-z0-9]{1,8}$/i)?.[0] || '.pdf';
+  const sourceExtension = detectedExtension || sourceName.match(/\.[a-z0-9]{1,8}$/i)?.[0] || '.pdf';
   const cleanTitle = title.replace(/[\\/:*?"<>|\r\n]+/g, '-').trim() || 'material';
-  return cleanTitle.toLowerCase().endsWith(sourceExtension.toLowerCase())
-    ? cleanTitle
-    : `${cleanTitle}${sourceExtension}`;
+  const titleWithoutWrongExtension = cleanTitle.replace(/\.(pdf|xlsx|xls|csv)$/i, '');
+  return `${titleWithoutWrongExtension}${sourceExtension}`;
+}
+
+function detectFileType(bytes: Uint8Array, declaredType: string | null, fileName: string) {
+  const isPdf = bytes.length >= 4
+    && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  if (isPdf) return { extension: '.pdf', contentType: 'application/pdf' };
+
+  const isLegacyExcel = bytes.length >= 8
+    && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0;
+  if (isLegacyExcel) return { extension: '.xls', contentType: 'application/vnd.ms-excel' };
+
+  const isZip = bytes.length >= 4
+    && bytes[0] === 0x50 && bytes[1] === 0x4b
+    && ((bytes[2] === 0x03 && bytes[3] === 0x04)
+      || (bytes[2] === 0x05 && bytes[3] === 0x06)
+      || (bytes[2] === 0x07 && bytes[3] === 0x08));
+  if (isZip && /planilha|excel|precifica/i.test(fileName)) {
+    return {
+      extension: '.xlsx',
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    };
+  }
+
+  const extension = fileName.match(/\.(pdf|xlsx|xls|csv)$/i)?.[0]?.toLowerCase();
+  const byExtension: Record<string, string> = {
+    '.pdf': 'application/pdf',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.xls': 'application/vnd.ms-excel',
+    '.csv': 'text/csv'
+  };
+  return {
+    extension: extension || '',
+    contentType: (extension && byExtension[extension]) || declaredType || 'application/octet-stream'
+  };
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -63,7 +96,6 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (!enrollment) return new NextResponse('Você não tem acesso a este material.', { status: 403 });
   }
 
-  const fileName = safeFileName(material.title, material.file_url);
   let fileResponse: Response;
   if (material.file_url.startsWith('storage://')) {
     const match = material.file_url.match(/^storage:\/\/([^/]+)\/(.+)$/);
@@ -77,9 +109,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (!fileResponse.ok || !fileResponse.body) return new NextResponse('Não foi possível baixar o arquivo.', { status: 502 });
   }
 
-  return new NextResponse(fileResponse.body, {
+  const fileBytes = new Uint8Array(await fileResponse.arrayBuffer());
+  const detected = detectFileType(
+    fileBytes,
+    fileResponse.headers.get('content-type'),
+    `${material.title} ${material.file_url}`
+  );
+  const fileName = safeFileName(material.title, material.file_url, detected.extension || undefined);
+
+  return new NextResponse(fileBytes, {
     headers: {
-      'Content-Type': fileResponse.headers.get('content-type') || 'application/octet-stream',
+      'Content-Type': detected.contentType,
       'Content-Disposition': `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       'Cache-Control': 'private, no-store'
     }
