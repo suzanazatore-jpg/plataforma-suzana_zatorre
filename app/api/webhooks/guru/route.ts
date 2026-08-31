@@ -479,10 +479,13 @@ export async function POST(request: Request) {
     emailStatus = envio.ok ? 'sent' : 'failed';
   }
 
-  // 2) WhatsApp via Pabbly. Nao-fatal.
+  // 2) WhatsApp via Pabbly. Nao-fatal. So dispara para aluna NOVA -> um unico acesso
+  //    por cliente. Em compras de varios produtos a Guru manda um webhook por produto;
+  //    os eventos seguintes (a conta ja existe) nao devem reenviar nem sobrescrever a
+  //    senha no BotConversa. Por isso condicionamos ao isNewUser, igual ao e-mail acima.
   let pabblyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
   const pabblyUrl = process.env.PABBLY_ACCESS_WEBHOOK_URL?.trim();
-  if (pabblyUrl) {
+  if (pabblyUrl && isNewUser) {
     try {
       const pabblyResponse = await fetch(pabblyUrl, {
         method: 'POST',
